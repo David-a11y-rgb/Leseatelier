@@ -225,8 +225,8 @@ function renderWant(){
 
 /* Explicit, device-local decisions for the requested reading suggestions. */
 const READING_SUGGESTIONS=[
-  {id:'vollmann-the-rifles',title:'The Rifles',authorFirst:'William T.',authorLast:'Vollmann'},
-  {id:'vollmann-hobo-blues',title:'Hobo Blues',authorFirst:'William T.',authorLast:'Vollmann'}
+  {id:'vollmann-the-rifles',title:'The Rifles',authorFirst:'William T.',authorLast:'Vollmann',isbn:'9780140176230',publisher:'Penguin Books',year:1995,pages:432,edition:'Taschenbuch · Englisch',cover:'https://images4.penguinrandomhouse.com/cover/9780140176230'},
+  {id:'vollmann-hobo-blues',title:'Hobo Blues',authorFirst:'William T.',authorLast:'Vollmann',isbn:'9783518420195',publisher:'Suhrkamp',year:2009,pages:275,edition:'Gebunden · Deutsch',cover:'https://pictures.abebooks.com/isbn/9783518420195-de.jpg'}
 ];
 let suggestionBusy=false;
 function suggestionExists(s){
@@ -240,8 +240,8 @@ function renderReadingSuggestions(){
   const panel=$('readingSuggestions'),pending=pendingSuggestions();
   panel.classList.toggle('hidden',!['library','want'].includes(view)||!pending.length);
   panel.innerHTML=pending.length?'<h2>Für deine Want-to-Read-Liste</h2>'+
-    pending.map(s=>'<div style="margin-top:16px"><p><strong>'+esc(s.title)+'</strong> · William T. Vollmann</p>'+
-      '<p>Zu Want to Read hinzufügen?</p><div style="display:flex;gap:10px;margin-top:8px">'+
+    pending.map(s=>'<div style="margin-top:16px">'+coverHtml(s)+'<p><strong>'+esc(s.title)+'</strong> · William T. Vollmann</p>'+
+      '<p>'+esc([s.publisher,s.year,s.edition].join(' · '))+'<br>ISBN '+esc(s.isbn)+'</p><p>Zu Want to Read hinzufügen?</p><div style="display:flex;gap:10px;margin-top:8px">'+
       '<button type="button" class="btn btn-primary" data-suggestion="'+s.id+'" data-answer="yes" aria-label="'+esc(s.title)+': Ja, hinzufügen">Ja</button>'+
       '<button type="button" class="btn btn-light" data-suggestion="'+s.id+'" data-answer="no" aria-label="'+esc(s.title)+': Nein">Nein</button></div></div>').join(''):'';
 }
@@ -252,8 +252,8 @@ async function answerReadingSuggestion(suggestionId,answer){
   try{
     if(answer==='yes'&&!suggestionExists(s)){
       data.books.unshift({id:id(),title:s.title,authorFirst:s.authorFirst,authorLast:s.authorLast,
-        isbn:'',publisher:'',year:null,format:'print',status:'want',cover:'',tags:[],notes:'',
-        pages:0,audioTotal:0,currentPage:0,currentAudio:0,rating:0,loan:'home',
+        isbn:s.isbn,publisher:s.publisher,year:s.year,format:'print',status:'want',cover:s.cover,tags:[],notes:'',
+        pages:s.pages,audioTotal:0,currentPage:0,currentAudio:0,rating:0,loan:'home',
         addedAt:new Date().toISOString(),finishedAt:null});
     }
     data.suggestionDecisions={...data.suggestionDecisions,[s.id]:answer};
