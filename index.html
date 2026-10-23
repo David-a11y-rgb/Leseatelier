@@ -89,6 +89,7 @@
     <div class="scan-box"><label for="isbnInput">ISBN / EAN</label><div class="isbn-row"><input id="isbnInput" inputmode="numeric" autocomplete="off" placeholder="ISBN-13 oder ISBN-10" /><button type="button" id="findIsbn" class="btn btn-dark">Suchen</button><button type="button" id="scanIsbn" class="square-action" title="Barcode scannen" aria-label="Barcode scannen">▣</button></div><p class="field-hint">Buchdaten werden online aus Open Library geladen, soweit verfügbar.</p></div>
     <div class="cover-and-fields"><div class="cover-editor"><img id="coverPreview" alt="Buchcover" class="hidden" /><span id="coverPlaceholder">Cover</span><label class="cover-upload">Bild wählen<input id="coverFile" type="file" accept="image/*" hidden /></label><button type="button" id="coverSearchButton" class="cover-search-button">Cover suchen</button></div><div class="stacked-fields"><div class="field"><label for="titleInput">Buchtitel *</label><input id="titleInput" required placeholder="Titel" /></div><div class="field"><label for="firstNameInput">Autor – Vorname</label><input id="firstNameInput" placeholder="Vorname" /></div><div class="field"><label for="lastNameInput">Autor – Nachname</label><input id="lastNameInput" placeholder="Nachname" /></div></div></div>
     <p id="coverInfo" class="field-hint cover-info" role="status" aria-live="polite"></p>
+    <p class="field-hint"><a id="googleCoverIsbn" target="_blank" rel="noopener noreferrer">Google Bilder: genaue ISBN ↗</a> · <a id="googleCoverTitle" target="_blank" rel="noopener noreferrer">Google Bilder: Titel und Ausgabe ↗</a><br>Passendes Bild dort speichern und über „Bild wählen“ übernehmen. Die Suche öffnet einen neuen Tab; dein Formular bleibt erhalten.</p>
     <div id="coverGallery" class="cover-gallery hidden">
       <button type="button" id="coverPrevious" class="cover-gallery-arrow" aria-label="Frühere Cover-Vorschläge">‹</button>
       <div id="coverResults" class="cover-results" tabindex="0" role="region" aria-label="Cover-Vorschläge, seitwärts scrollen"></div>
@@ -117,3 +118,4 @@
 <script src="app.js" defer></script>
 </body>
 </html>
+
