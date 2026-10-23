@@ -222,7 +222,48 @@ function renderWant(){
     </div>
   </div>`).join(''):emptyHtml(true,!!q);
 }
-function render(){if(view==='library')renderLibrary();else if(view==='want')renderWant();else if(view==='stats')renderStats();}
+
+/* Explicit, device-local decisions for the requested reading suggestions. */
+const READING_SUGGESTIONS=[
+  {id:'vollmann-the-rifles',title:'The Rifles',authorFirst:'William T.',authorLast:'Vollmann'},
+  {id:'vollmann-hobo-blues',title:'Hobo Blues',authorFirst:'William T.',authorLast:'Vollmann'}
+];
+let suggestionBusy=false;
+function suggestionExists(s){
+  return data.books.some(b=>normalizedCoverText(b.title)===normalizedCoverText(s.title)&&
+    normalizedCoverText(b.authorLast)===normalizedCoverText(s.authorLast));
+}
+function pendingSuggestions(){
+  return READING_SUGGESTIONS.filter(s=>!data.suggestionDecisions?.[s.id]&&!suggestionExists(s));
+}
+function renderReadingSuggestions(){
+  const panel=$('readingSuggestions'),pending=pendingSuggestions();
+  panel.classList.toggle('hidden',!['library','want'].includes(view)||!pending.length);
+  panel.innerHTML=pending.length?'<h2>Für deine Want-to-Read-Liste</h2>'+
+    pending.map(s=>'<div style="margin-top:16px"><p><strong>'+esc(s.title)+'</strong> · William T. Vollmann</p>'+
+      '<p>Zu Want to Read hinzufügen?</p><div style="display:flex;gap:10px;margin-top:8px">'+
+      '<button type="button" class="btn btn-primary" data-suggestion="'+s.id+'" data-answer="yes" aria-label="'+esc(s.title)+': Ja, hinzufügen">Ja</button>'+
+      '<button type="button" class="btn btn-light" data-suggestion="'+s.id+'" data-answer="no" aria-label="'+esc(s.title)+': Nein">Nein</button></div></div>').join(''):'';
+}
+async function answerReadingSuggestion(suggestionId,answer){
+  const s=READING_SUGGESTIONS.find(x=>x.id===suggestionId);
+  if(!s||!['yes','no'].includes(answer)||suggestionBusy||data.suggestionDecisions?.[s.id])return;
+  suggestionBusy=true;
+  try{
+    if(answer==='yes'&&!suggestionExists(s)){
+      data.books.unshift({id:id(),title:s.title,authorFirst:s.authorFirst,authorLast:s.authorLast,
+        isbn:'',publisher:'',year:null,format:'print',status:'want',cover:'',tags:[],notes:'',
+        pages:0,audioTotal:0,currentPage:0,currentAudio:0,rating:0,loan:'home',
+        addedAt:new Date().toISOString(),finishedAt:null});
+    }
+    data.suggestionDecisions={...data.suggestionDecisions,[s.id]:answer};
+    await save();
+    render();
+    toast(answer==='yes'?'„'+s.title+'“ ist auf deiner Want-to-Read-Liste.':'Vorschlag ausgeblendet.');
+  }finally{suggestionBusy=false;}
+}
+
+function render(){renderReadingSuggestions();if(view==='library')renderLibrary();else if(view==='want')renderWant();else if(view==='stats')renderStats();}
 function initBookForm(b=null,preferWant=false){clearTimeout(coverSearchTimer);coverQueryToken++;coverCandidates=[];$('coverResults').innerHTML='';$('coverGallery').classList.add('hidden');$('coverInfo').textContent='';activeBookId=b?.id||null;$('bookForm').reset();$('bookId').value=b?.id||'';
   const fields={isbnInput:'isbn',titleInput:'title',firstNameInput:'authorFirst',lastNameInput:'authorLast',publisherInput:'publisher',yearInput:'year',formatInput:'format',readStatusInput:'status',pagesInput:'pages',audioTotalInput:'audioTotal',currentPageInput:'currentPage',currentAudioInput:'currentAudio',notesInput:'notes',loanInput:'loan',loanPersonInput:'loanPerson',loanDateInput:'loanDate',loanDueInput:'loanDue'};
   for(const [field,key]of Object.entries(fields)){if(b?.[key]!==undefined && b?.[key]!==null)$(field).value=field==='publisherInput'?cleanPublisher(b[key]):b[key];}if(b?.publisherOriginal&&!b.publisher){$('publisherInput').placeholder='Verlag noch prüfen';void repairPublisherForBook(b.id);}else $('publisherInput').placeholder='Verlag';
@@ -824,7 +865,9 @@ function loadDemo(){if(data.books.length||data.sessions.length){if(!confirm('Bei
   data.books.push(...demo);for(let day=0;day<24;day++){const d=localDay(addDays(today,-day));if(day%4!==0)data.sessions.push({id:id(),bookId:demo[day%2===0?1:0].id,type:'read',date:d,amount:12+(day*7)%40,duration:30,createdAt:new Date().toISOString()});if(day%3===0)data.sessions.push({id:id(),bookId:demo[2].id,type:'listen',date:d,amount:20+(day*9)%48,duration:20+(day*9)%48,createdAt:new Date().toISOString()});}
   save();showView('stats');toast('Beispieldaten geladen. Du kannst sie einzeln löschen oder ein Backup importieren.');}
 function urlImport(){const u=new URL(location.href);const title=u.searchParams.get('title');if(!title)return;const author=u.searchParams.get('author')||'';const isbn=u.searchParams.get('isbn')||'';initBookForm(null,u.searchParams.get('want')==='1');$('titleInput').value=title;const parts=author.trim().split(/\s+/);$('lastNameInput').value=parts.length?parts.pop():'';$('firstNameInput').value=parts.join(' ');$('isbnInput').value=isbn;history.replaceState({},'',location.pathname+location.hash);scheduleCoverLookup();toast('Empfehlung vorausgefüllt. Bitte Angaben prüfen und speichern.');}
-function attach(){for(const b of document.querySelectorAll('[data-nav]'))b.addEventListener('click',()=>showView(b.dataset.nav));$('mobileAdd').addEventListener('click',()=>initBookForm(null,view==='want'));$('wantChatHelp').onclick=()=>{showView('more');$('copyChatSetup').scrollIntoView({behavior:'smooth',block:'center'});};
+function attach(){
+  $('readingSuggestions').onclick=e=>{const button=e.target.closest('button[data-suggestion]');if(button)void answerReadingSuggestion(button.dataset.suggestion,button.dataset.answer);};
+for(const b of document.querySelectorAll('[data-nav]'))b.addEventListener('click',()=>showView(b.dataset.nav));$('mobileAdd').addEventListener('click',()=>initBookForm(null,view==='want'));$('wantChatHelp').onclick=()=>{showView('more');$('copyChatSetup').scrollIntoView({behavior:'smooth',block:'center'});};
   for(const el of ['librarySearch','libraryFilter','librarySort','wantSearch','wantSort'])$(el).addEventListener(el.endsWith('Search')?'input':'change',render);
   for(const b of document.querySelectorAll('[data-period]'))b.addEventListener('click',()=>{statsPeriod=b.dataset.period;document.querySelectorAll('[data-period]').forEach(x=>x.classList.toggle('active',x===b));renderStats();});$('periodPrevious').onclick=()=>changeStatsAnchor(-1);$('periodNext').onclick=()=>changeStatsAnchor(1);
   $('overlay').onclick=closeSheets;document.querySelectorAll('[data-close]').forEach(b=>b.onclick=closeSheets);document.addEventListener('keydown',e=>{if(e.key==='Escape')closeSheets();});
