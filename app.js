@@ -94,7 +94,120 @@ function renderLibrary(){const collection=data.books.filter(b=>b.status!=='want'
   $('libraryResultCount').textContent=`${entries.length} ${entries.length===1?'Buch':'Bücher'}`;
   $('libraryList').innerHTML=entries.length?entries.map(bookHtml).join(''):emptyHtml(false,!!q||filter!=='all');
 }
-function renderWant(){const q=$('wantSearch').value,entries=sortBooks(data.books.filter(b=>b.status==='want'&&matchesSearch(b,q)),$('wantSort').value);$('wantCount').textContent=`${entries.length} ${entries.length===1?'Buch':'Bücher'}`;$('wantList').innerHTML=entries.length?entries.map(bookHtml).join(''):emptyHtml(true,!!q);}
+
+/* Search German or English editions of the same work via Open Library,
+   then open a targeted search at Medimops / momoxbooks.
+   Edition metadata never implies that Medimops has stock. */
+let medimopsLookupToken=0;
+function medimopsSearchUrl(text){
+  return 'https://www.momoxbooks.com/de/search?'+new URLSearchParams({q:String(text).trim()});
+}
+function editionLanguage(e){
+  const codes=(e.languages||[]).map(l=>typeof l==='string'?l:(l.key||'').split('/').pop());
+  if(codes.some(c=>['ger','deu','de'].includes(c)))return 'de';
+  if(codes.some(c=>['eng','en'].includes(c)))return 'en';
+  return null;
+}
+function editionIsbn(e){
+  return [...(e.isbn_13||[]),...(e.isbn_10||[])].find(x=>/^(?:\d{13}|\d{9}[\dXx])$/.test(String(x).replace(/[-\s]/g,'')))||'';
+}
+async function medimopsWorkKey(book){
+  const isbn=String(book.isbn||'').replace(/[-\s]/g,'');
+  if(/^(?:\d{13}|\d{9}[\dXx])$/.test(isbn)){
+    try{
+      const result=await fetchCoverJson('https://openlibrary.org/isbn/'+encodeURIComponent(isbn)+'.json');
+      const key=result.works?.[0]?.key;
+      if(/^\/works\/OL\d+W$/.test(key||''))return key;
+    }catch(e){console.info('Werk anhand ISBN nicht gefunden:',e);}
+  }
+  if(!book.title)return null;
+  const params=new URLSearchParams({title:book.title,fields:'key,title,author_name',limit:'5'});
+  const author=[book.authorFirst,book.authorLast].filter(Boolean).join(' ');
+  if(author)params.set('author',author);
+  const results=await fetchCoverJson('https://openlibrary.org/search.json?'+params);
+  const desired=normalizedCoverText(book.title);
+  const best=(results.docs||[]).find(d=>{
+    const title=normalizedCoverText(d.title);
+    const matchingTitle=title===desired || (desired.length>=7 && (title.includes(desired)||desired.includes(title)));
+    const surname=normalizedCoverText(book.authorLast);
+    const matchingAuthor=!surname||(d.author_name||[]).some(n=>normalizedCoverText(n).split(' ').includes(surname));
+    return matchingTitle&&matchingAuthor&&/^\/works\/OL\d+W$/.test(d.key||'');
+  });
+  return best?.key||null;
+}
+async function lookupMedimopsEditions(book,language){
+  const work=await medimopsWorkKey(book);
+  if(!work)return [];
+  const editions=await fetchCoverJson('https://openlibrary.org'+work+'/editions.json?limit=250');
+  const pool=(editions.entries||[]).filter(e=>editionLanguage(e)===language && e.title);
+  const queryTitle=normalizedCoverText(book.title);
+  const results=[],seen=new Set();
+  for(const e of pool){
+    const title=e.title.trim(),isbn=editionIsbn(e);
+    const ident=normalizedCoverText(title)+'|'+isbn;
+    if(seen.has(ident))continue;
+    seen.add(ident);
+    results.push({title,isbn,publisher:e.publishers?.[0]||'',year:e.publish_date||'',
+      coverId:e.covers?.find(n=>Number.isInteger(n)&&n>0)||null,
+      rank:(isbn?2:0)+(normalizedCoverText(title)===queryTitle?2:0)+(e.covers?.length?1:0)});
+  }
+  results.sort((a,b)=>b.rank-a.rank);
+  // Many editions use the same title. Offer different titles first, then distinct ISBNs.
+  const chosen=[],titles=new Set();
+  for(const e of results){const title=normalizedCoverText(e.title);if(!titles.has(title)){titles.add(title);chosen.push(e);}if(chosen.length>=5)break;}
+  if(chosen.length<5)for(const e of results){if(chosen.includes(e))continue;if(e.isbn){chosen.push(e);if(chosen.length>=5)break;}}
+  return chosen;
+}
+function medimopsCard(b,language,verified){
+  const query=[b.title,[b.authorFirst,b.authorLast].filter(Boolean).join(' ')].filter(Boolean).join(' ');
+  const url=medimopsSearchUrl(query);
+  return '<div class="medimops-fallback"><p>'+ (verified?
+    'Die genaue Ausgabe konnte nicht bestimmt werden. Du kannst auf Medimops nach dem Titel suchen.':
+    'Keine eindeutig zugeordnete '+(language==='de'?'deutsche':'englische')+' Ausgabe gefunden. Suche alternativ nach dem bekannten Titel; das ist keine bestätigte Übersetzung.')+
+    '</p><a class="btn btn-light" href="'+esc(url)+'" target="_blank" rel="noopener noreferrer">Mit Titel auf Medimops suchen ↗</a></div>';
+}
+async function showMedimops(bookId,language){
+  const b=data.books.find(b=>b.id===bookId);
+  if(!b||!['de','en'].includes(language))return;
+  const token=++medimopsLookupToken;
+  $('medimopsTitle').textContent=language==='de'?'Deutsche Ausgabe':'Englische Ausgabe';
+  $('medimopsIntro').textContent=b.title+' · '+[b.authorFirst,b.authorLast].filter(Boolean).join(' ');
+  $('medimopsResults').innerHTML='<p class="field-hint">Suche nach Ausgaben desselben Werks …</p>';
+  openSheet('medimopsSheet');
+  try{
+    const editions=await lookupMedimopsEditions(b,language);
+    if(token!==medimopsLookupToken||$('medimopsSheet').classList.contains('hidden'))return;
+    const entries=editions.map(e=>{
+      const query=e.isbn||[e.title,[b.authorFirst,b.authorLast].filter(Boolean).join(' ')].filter(Boolean).join(' ');
+      const href=medimopsSearchUrl(query);
+      const image=e.coverId?'<img loading="lazy" src="https://covers.openlibrary.org/b/id/'+e.coverId+'-S.jpg" alt="">':'';
+      return '<div class="medimops-edition">'+image+'<div class="medimops-edition-text"><strong>'+esc(e.title)+'</strong>'+
+        '<small>'+esc([e.publisher,e.year].filter(Boolean).join(' · '))+(e.isbn?' · ISBN '+esc(e.isbn):'')+'</small>'+
+        '<a href="'+esc(href)+'" target="_blank" rel="noopener noreferrer">Bei Medimops suchen ↗</a></div></div>';
+    }).join('');
+    $('medimopsResults').innerHTML='<p class="medimops-note">Mögliche '+(language==='de'?'deutsche':'englische')+
+      ' Ausgaben aus Open Library. Der Medimops-Link startet eine Suche, keine geprüfte Verfügbarkeit oder Preisabfrage.</p>'+
+      (entries||medimopsCard(b,language,false))+ (entries?medimopsCard(b,language,true):'');
+  }catch(e){
+    if(token!==medimopsLookupToken)return;
+    $('medimopsResults').innerHTML='<p class="field-hint">Ausgaben konnten momentan nicht abgefragt werden.</p>'+medimopsCard(b,language,false);
+  }
+}
+
+function renderWant(){
+  const q=$('wantSearch').value,entries=sortBooks(data.books.filter(b=>b.status==='want'&&matchesSearch(b,q)),$('wantSort').value);
+  $('wantCount').textContent=`${entries.length} ${entries.length===1?'Buch':'Bücher'}`;
+  $('wantList').innerHTML=entries.length?entries.map(b=>`<div class="want-book">
+    ${bookHtml(b)}
+    <div class="want-medimops">
+      <span class="want-medimops-caption">Bei Medimops suchen</span>
+      <div class="want-medimops-buttons">
+        <button type="button" data-medimops-book="${esc(b.id)}" data-medimops-lang="de" aria-label="Deutsche Ausgabe von ${esc(b.title)} bei Medimops suchen">DE</button>
+        <button type="button" data-medimops-book="${esc(b.id)}" data-medimops-lang="en" aria-label="Englische Ausgabe von ${esc(b.title)} bei Medimops suchen">EN</button>
+      </div>
+    </div>
+  </div>`).join(''):emptyHtml(true,!!q);
+}
 function render(){if(view==='library')renderLibrary();else if(view==='want')renderWant();else if(view==='stats')renderStats();}
 function initBookForm(b=null,preferWant=false){clearTimeout(coverSearchTimer);coverQueryToken++;coverCandidates=[];$('coverResults').innerHTML='';$('coverInfo').textContent='';activeBookId=b?.id||null;$('bookForm').reset();$('bookId').value=b?.id||'';
   const fields={isbnInput:'isbn',titleInput:'title',firstNameInput:'authorFirst',lastNameInput:'authorLast',publisherInput:'publisher',yearInput:'year',formatInput:'format',readStatusInput:'status',pagesInput:'pages',audioTotalInput:'audioTotal',currentPageInput:'currentPage',currentAudioInput:'currentAudio',notesInput:'notes',loanInput:'loan',loanPersonInput:'loanPerson',loanDateInput:'loanDate',loanDueInput:'loanDue'};
@@ -486,7 +599,7 @@ function attach(){for(const b of document.querySelectorAll('[data-nav]'))b.addEv
   for(const el of ['librarySearch','libraryFilter','librarySort','wantSearch','wantSort'])$(el).addEventListener(el.endsWith('Search')?'input':'change',render);
   for(const b of document.querySelectorAll('[data-period]'))b.addEventListener('click',()=>{statsPeriod=b.dataset.period;document.querySelectorAll('[data-period]').forEach(x=>x.classList.toggle('active',x===b));renderStats();});$('periodPrevious').onclick=()=>changeStatsAnchor(-1);$('periodNext').onclick=()=>changeStatsAnchor(1);
   $('overlay').onclick=closeSheets;document.querySelectorAll('[data-close]').forEach(b=>b.onclick=closeSheets);document.addEventListener('keydown',e=>{if(e.key==='Escape')closeSheets();});
-  for(const container of ['libraryList','wantList'])$(container).addEventListener('click',e=>{const add=e.target.closest('[data-add]');if(add){initBookForm(null,add.dataset.add==='want');return;}const book=e.target.closest('[data-book]');if(book)showDetail(book.dataset.book);});
+  for(const container of ['libraryList','wantList'])$(container).addEventListener('click',e=>{const med=e.target.closest('[data-medimops-book]');if(med){void showMedimops(med.dataset.medimopsBook,med.dataset.medimopsLang);return;}const add=e.target.closest('[data-add]');if(add){initBookForm(null,add.dataset.add==='want');return;}const book=e.target.closest('[data-book]');if(book)showDetail(book.dataset.book);});
   $('bookForm').onsubmit=onBookSave;$('deleteBook').onclick=deleteBook;$('ratingInput').oninput=updateRating;$('loanInput').onchange=updateLoan;$('findIsbn').onclick=lookupISBN;$('scanIsbn').onclick=openScanner;$('coverFile').onchange=e=>coverFromFile(e.target.files?.[0]);
   $('coverSearchButton').onclick=()=>{clearTimeout(coverSearchTimer);void searchCoverForm();};
   $('coverResults').onclick=e=>{
