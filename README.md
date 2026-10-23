@@ -13,6 +13,7 @@ Eine lokale, private Progressive Web App für die eigene Bibliothek.
 - Diagramme für laufende Woche, laufenden Monat und laufendes Jahr.
 - JSON-Backup/-Import, CSV-Export, freiwilliger Bibliothekstext für ChatGPT.
 - Empfehlung-Deep-Links von ChatGPT zum vorausgefüllten Want-to-Read-Eintrag.
+- Medimops-Suche aus der Want-to-Read-Liste: separate DE-/EN-Schaltflächen, Open-Library-Abgleich mit möglichen deutschen und englischen Ausgaben, anschließend Suche bei momoxbooks/medimops nach ISBN bzw. Titel. Keine Livepreise oder Bestandsanzeige.
 - Offline nutzbare App-Oberfläche nach erstmaligem Laden.
 
 ## Einrichten (GitHub Pages)
@@ -37,6 +38,7 @@ Optional: `&isbn=978...`. Beim Öffnen erscheint ein vorausgefüllter Bearbeitun
 
 ## Grenzen dieser ersten Version
 - Keine direkte Schreib- oder Leseberechtigung für ChatGPT; vorerst Empfehlung-Links und kopierbare Bestandsliste.
+- Die Sprach-/Ausgaben-Zuordnung stammt aus Open Library. Bei unvollständigen Einträgen wird nur eine Suche mit dem bekannten Titel angeboten. Medimops-Suchtreffer müssen auf Sprache, Ausgabe und Verfügbarkeit geprüft werden.
 - Keine Cloud-/Geräte-Synchronisierung. Lokale Löschung von Safari-Website-Daten kann Einträge entfernen. Regelmäßig JSON-Backups machen!
 - Coverfoto hochladen ist möglich, **automatische Identifikation allein aus dem Coverfoto noch nicht**.
 - Barcode-Erkennung ist browserabhängig; iOS-Safari kann `BarcodeDetector` möglicherweise nicht anbieten. In diesem Fall ISBN manuell erfassen oder später eine zusätzliche Scan-Bibliothek integrieren.
