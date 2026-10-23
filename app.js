@@ -637,12 +637,20 @@ function applyScannedIsbn(raw){
   const isbn=readIsbnBarcode(raw);
   if(!isbn||$('scannerSheet').classList.contains('hidden')||liveScanCompleted)return false;
   liveScanCompleted=true;
-  // A live match immediately closes the camera and fills ISBN metadata,
-  // without any photo shutter or user confirmation.
-  closeSheets();
+  // Hide the scanner immediately, even while its asynchronous teardown runs.
+  $('scannerSheet').classList.add('hidden');
+  void stopScan();
   $('isbnInput').value=isbn;
   openSheet('bookSheet');
-  toast('ISBN automatisch erkannt: '+isbn);
+  const sheet=$('bookSheet'),heading=$('bookSheetTitle');
+  sheet.scrollTop=0;
+  const body=sheet.querySelector('.sheet-body');
+  if(body)body.scrollTop=0;
+  heading.setAttribute('tabindex','-1');
+  heading.focus({preventScroll:true});
+  updateCoverSearchLinks();
+  $('coverInfo').textContent='Barcode erkannt. Buchdaten werden geladen …';
+  toast('Barcode erkannt – Buchangaben prüfen und anschließend speichern.');
   void lookupISBN();
   return true;
 }
