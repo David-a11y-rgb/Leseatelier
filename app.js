@@ -6,6 +6,7 @@ const KEY = 'main';
 let data = { schema: 1, books: [], sessions: [] };
 let view = 'library', statsPeriod = 'week', statsAnchor = new Date(), activeBookId = null;
 let html5Scanner = null, scannerLoadPromise = null, scanSession = 0;
+let enhancedDecoderPromise = null, enhancedScanTimer = null, enhancedScanBusy = false;
 const STATUS = { want: 'Want to Read', reading: 'Lese ich', read: 'Gelesen', dnf: 'Abgebrochen' };
 const FORMAT = { print: 'Buch', ebook: 'E-Book', audio: 'Hörbuch' };
 const dbPromise = (() => {
@@ -64,7 +65,12 @@ function fmtNum(n){return new Intl.NumberFormat('de-DE',{maximumFractionDigits:1
 function fmtDay(iso){if(!iso)return '';try{return new Intl.DateTimeFormat('de-DE',{day:'2-digit',month:'short',year:'numeric'}).format(parseDay(iso));}catch(_){return iso;}}
 function toast(message,error=false){const el=$('toast');el.textContent=message;el.classList.remove('hidden');el.classList.toggle('error',error);clearTimeout(toast.timer);toast.timer=setTimeout(()=>el.classList.add('hidden'),4200);}
 function openSheet(sheet){$('overlay').classList.remove('hidden');$(sheet).classList.remove('hidden');document.body.style.overflow='hidden';}
-async function stopScan(){scanSession++;const scanner=html5Scanner;html5Scanner=null;if(scanner){try{await scanner.stop();}catch(_){}try{scanner.clear();}catch(_){}}}
+async function stopScan(){
+  scanSession++;
+  if(enhancedScanTimer!==null){clearInterval(enhancedScanTimer);enhancedScanTimer=null;}
+  const scanner=html5Scanner;html5Scanner=null;
+  if(scanner){try{await scanner.stop();}catch(_){}try{scanner.clear();}catch(_){}}
+}
 function closeSheets(){stopScan();for(const el of document.querySelectorAll('.sheet'))el.classList.add('hidden');$('overlay').classList.add('hidden');document.body.style.overflow='';}
 function showView(next){closeSheets();view=next;for(const s of document.querySelectorAll('.view')) s.classList.toggle('hidden',s.id!==`view-${next}`);for(const b of document.querySelectorAll('[data-nav]')){const current=b.dataset.nav===next;b.classList.toggle('active',current);if(current)b.setAttribute('aria-current','page');else b.removeAttribute('aria-current');}render();window.scrollTo({top:0,behavior:'instant'});}
 function displayAuthor(b){return [b.authorFirst,b.authorLast].filter(Boolean).join(' ') || 'Autor unbekannt';}
@@ -129,12 +135,26 @@ function loadScannerLibrary(){
       const script=document.createElement('script');
       script.src='https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js';
       script.async=true;
-      script.onload=()=>window.Html5Qrcode?resolve():reject(new Error('Scan-Bibliothek nicht verfügbar'));
-      script.onerror=()=>reject(new Error('Scan-Bibliothek konnte nicht geladen werden'));
+      script.onload=()=>window.Html5Qrcode?resolve():reject(new Error('Scanner-Bibliothek fehlt'));
+      script.onerror=()=>reject(new Error('Scanner-Bibliothek konnte nicht geladen werden'));
       document.head.append(script);
     }).catch(e=>{scannerLoadPromise=null;throw e;});
   }
   return scannerLoadPromise;
+}
+function loadEnhancedDecoder(){
+  if(window.ZXingWASM?.readBarcodes)return Promise.resolve(window.ZXingWASM);
+  if(!enhancedDecoderPromise){
+    enhancedDecoderPromise=new Promise((resolve,reject)=>{
+      const script=document.createElement('script');
+      script.src='https://cdn.jsdelivr.net/npm/zxing-wasm@2.2.2/dist/iife/reader/index.js';
+      script.async=true;
+      script.onload=()=>window.ZXingWASM?.readBarcodes?resolve(window.ZXingWASM):reject(new Error('Zweite Barcode-Erkennung fehlt'));
+      script.onerror=()=>reject(new Error('Zweite Barcode-Erkennung nicht verfügbar'));
+      document.head.append(script);
+    }).catch(e=>{enhancedDecoderPromise=null;throw e;});
+  }
+  return enhancedDecoderPromise;
 }
 function readIsbnBarcode(raw){
   const digits=String(raw||'').replace(/\D/g,'');
@@ -142,7 +162,7 @@ function readIsbnBarcode(raw){
 }
 function applyScannedIsbn(raw){
   const isbn=readIsbnBarcode(raw);
-  if(!isbn)return false;
+  if(!isbn||$('scannerSheet').classList.contains('hidden'))return false;
   closeSheets();
   $('isbnInput').value=isbn;
   openSheet('bookSheet');
@@ -150,12 +170,60 @@ function applyScannedIsbn(raw){
   lookupISBN();
   return true;
 }
+function adjustScannerCamera(scanner){
+  // iOS sometimes returns a low-resolution or unfocused live camera stream.
+  // Applying video constraints after start() helps it renegotiate the track.
+  try{
+    const capabilities=scanner.getRunningTrackCapabilities?.()||{};
+    const settings=scanner.getRunningTrackSettings?.()||{};
+    const advanced=[];
+    const zoomInfo=capabilities.zoom;
+    if(zoomInfo && typeof zoomInfo==='object' && Number.isFinite(zoomInfo.max)){
+      const zoom=Math.min(1.6,zoomInfo.max);
+      if(zoom>=(zoomInfo.min||1))advanced.push({zoom});
+    }
+    const constraints={width:{ideal:1280},height:{ideal:720},frameRate:{ideal:24}};
+    if(advanced.length)constraints.advanced=advanced;
+    return scanner.applyVideoConstraints(constraints).catch(err=>console.info('Kameravorgaben nicht anwendbar:',err));
+  }catch(err){console.info('Kamera-Anpassung nicht möglich:',err);return Promise.resolve();}
+}
+async function startEnhancedScan(token){
+  try{
+    const decoder=await loadEnhancedDecoder();
+    if(token!==scanSession || $('scannerSheet').classList.contains('hidden'))return;
+    const canvas=document.createElement('canvas');
+    const ctx=canvas.getContext('2d',{willReadFrequently:true});
+    if(!ctx)return;
+    enhancedScanTimer=setInterval(async()=>{
+      if(enhancedScanBusy||token!==scanSession||document.hidden)return;
+      const video=$('scannerReader').querySelector('video');
+      if(!video||video.readyState<2||!video.videoWidth||!video.videoHeight)return;
+      enhancedScanBusy=true;
+      try{
+        const scale=Math.min(1,1280/video.videoWidth);
+        canvas.width=Math.round(video.videoWidth*scale);
+        canvas.height=Math.round(video.videoHeight*scale);
+        ctx.drawImage(video,0,0,canvas.width,canvas.height);
+        const frame=ctx.getImageData(0,0,canvas.width,canvas.height);
+        const matches=await decoder.readBarcodes(frame,{
+          formats:['EAN13','EAN8','Code128'],tryHarder:true,maxNumberOfSymbols:2
+        });
+        if(token===scanSession){
+          for(const match of matches){
+            if(applyScannedIsbn(match.text))break;
+          }
+        }
+      }catch(err){console.debug('Erweiterter Scan:',err);}
+      finally{enhancedScanBusy=false;}
+    },1100);
+  }catch(e){console.warn('Erweiterte Barcode-Erkennung konnte nicht geladen werden:',e);}
+}
 async function openScanner(){
   openSheet('scannerSheet');
-  $('scannerMessage').textContent='Kamera wird vorbereitet. Richte sie auf den Barcode auf der Buchrückseite.';
+  $('scannerMessage').textContent='Kamera wird vorbereitet. Halte die Buchrückseite ruhig und gut beleuchtet.';
   const token=++scanSession;
   try{
-    if(!navigator.mediaDevices?.getUserMedia)throw new Error('Kamera ist nicht verfügbar');
+    if(!navigator.mediaDevices?.getUserMedia)throw new Error('Kamera nicht verfügbar');
     await loadScannerLibrary();
     if(token!==scanSession||$('scannerSheet').classList.contains('hidden'))return;
     const scanner=new Html5Qrcode('scannerReader',{
@@ -163,41 +231,52 @@ async function openScanner(){
       experimentalFeatures:{useBarCodeDetectorIfSupported:false},verbose:false
     });
     html5Scanner=scanner;
-    await scanner.start({facingMode:'environment'},{fps:10,disableFlip:true},
-      value=>{if(token===scanSession)applyScannedIsbn(value);},
-      ()=>{});
+    await scanner.start({facingMode:'environment'},
+      {fps:12,disableFlip:true,aspectRatio:1.777778},
+      result=>{if(token===scanSession)applyScannedIsbn(result);},()=>{});
     if(token!==scanSession||$('scannerSheet').classList.contains('hidden')){
       try{await scanner.stop();}catch(_){}
       try{scanner.clear();}catch(_){}
-    }else $('scannerMessage').textContent='Richte den Barcode ruhig ins Bild. Alternativ kannst du ein Foto auswählen.';
+      return;
+    }
+    $('scannerMessage').textContent='Scanner aktiv. Barcode waagerecht, aus ca. 15–25 cm Abstand und bei gutem Licht zeigen. Falls nichts erkannt wird: „Barcode-Foto auswählen“.';
+    // Use a second, independent ZXing-C++ decoder in parallel where available.
+    startEnhancedScan(token);
+    adjustScannerCamera(scanner);
   }catch(e){
     if(token!==scanSession)return;
     await stopScan();
     console.warn('Scanner:',e);
-    $('scannerMessage').textContent='Kamera-Scanner konnte nicht gestartet werden. Prüfe die Kamerafreigabe oder nutze „Barcode-Foto auswählen“. Eine Internetverbindung wird beim ersten Scan benötigt.';
+    $('scannerMessage').textContent='Kamera konnte nicht gestartet werden. Prüfe die Kamerafreigabe. Alternativ kannst du ein Barcode-Foto aufnehmen oder die ISBN eingeben.';
   }
 }
 async function barcodeFromPhoto(file){
   if(!file)return;
   const el=$('scannerMessage');
-  el.textContent='Barcode-Foto wird ausgewertet …';
+  el.textContent='Barcode-Foto wird untersucht …';
   await stopScan();
-  let scanner=null;
+  let found=null,scanner=null;
   try{
     await loadScannerLibrary();
     scanner=new Html5Qrcode('scannerReader',{
       formatsToSupport:[Html5QrcodeSupportedFormats.EAN_13,Html5QrcodeSupportedFormats.EAN_8,Html5QrcodeSupportedFormats.CODE_128],
       experimentalFeatures:{useBarCodeDetectorIfSupported:false},verbose:false
     });
-    const value=await scanner.scanFile(file,false);
-    if(!applyScannedIsbn(value))el.textContent='Im Foto wurde keine gültige ISBN erkannt. Bitte Barcode deutlich und gerade fotografieren.';
-  }catch(e){
-    console.warn('Barcode-Foto:',e);
-    el.textContent='ISBN auf dem Foto nicht erkannt. Versuche ein schärferes Foto oder gib die ISBN manuell ein.';
-  }finally{
-    if(scanner){try{scanner.clear();}catch(_){}}
-    $('barcodePhoto').value='';
+    found=readIsbnBarcode(await scanner.scanFile(file,false));
+  }catch(e){console.info('Erster Foto-Scan:',e);}
+  finally{if(scanner){try{scanner.clear();}catch(_){}}}
+  if(!found){
+    try{
+      const decoder=await loadEnhancedDecoder();
+      const results=await decoder.readBarcodes(file,{
+        formats:['EAN13','EAN8','Code128'],tryHarder:true,maxNumberOfSymbols:4
+      });
+      found=results.map(x=>readIsbnBarcode(x.text)).find(Boolean)||null;
+    }catch(e){console.info('Erweiterter Foto-Scan:',e);}
   }
+  $('barcodePhoto').value='';
+  if(found)applyScannedIsbn(found);
+  else el.textContent='Keine ISBN erkannt. Fotografiere den Barcode gerade, scharf und mit Rand auf beiden Seiten, oder gib die ISBN manuell ein.';
 }
 function openSession(bookId=null){if(!data.books.length){toast('Lege zuerst ein Buch an.',true);initBookForm(null);return;}
   $('sessionForm').reset();$('sessionBook').innerHTML=data.books.map(b=>`<option value="${esc(b.id)}">${esc(b.title)} — ${esc(displayAuthor(b))}</option>`).join('');if(bookId&&data.books.some(x=>x.id===bookId))$('sessionBook').value=bookId;$('sessionDate').value=localDay();$('sessionType').value=(data.books.find(b=>b.id===$('sessionBook').value)?.format==='audio')?'listen':'read';updateSessionFields();openSheet('sessionSheet');}
