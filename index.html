@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#234c42" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="apple-mobile-web-app-title" content="Leseatelier" />
+  <meta name="description" content="Deine private Heimbibliothek, Leseliste und Lesestatistik." />
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="apple-touch-icon" href="apple-touch-icon.png" />
+  <link rel="icon" href="icon-192.png" />
+  <link rel="stylesheet" href="styles.css" />
+  <title>Leseatelier — Meine Bibliothek</title>
+</head>
+<body>
+<div id="app">
+  <aside class="side-nav">
+    <div class="brand-side"><span class="brand-symbol">◧</span><span>Leseatelier</span></div>
+    <div class="side-caption">MEINE BIBLIOTHEK</div>
+    <button class="side-link active" data-nav="library"><span>▦</span> Sammlung</button>
+    <button class="side-link" data-nav="want"><span>♧</span> Want to Read</button>
+    <button class="side-link" data-nav="stats"><span>▥</span> Statistiken</button>
+    <button class="side-link" data-nav="more"><span>⚙</span> Einstellungen</button>
+    <button class="sidebar-add" id="desktopAdd">＋ Buch hinzufügen</button>
+    <p class="side-footer">Privat. Unabhängig. Dein Lesekosmos.</p>
+  </aside>
+
+  <div class="content-shell">
+    <header class="topbar">
+      <div class="topbar-brand"><span class="brand-symbol">◧</span><span>Leseatelier</span></div>
+      <span class="topbar-context">Deine persönliche Bibliothek</span>
+      <button class="round-btn topbar-add" id="topAdd" title="Buch hinzufügen" aria-label="Buch hinzufügen">＋</button>
+    </header>
+    <main class="main-container" id="main">
+      <section class="view" id="view-library">
+        <div class="heading-row"><div><p class="eyebrow">DEINE SAMMLUNG</p><h1>Meine Bibliothek<span class="heading-dot">.</span></h1><p class="subhead" id="librarySubtitle">Alle Bücher an einem Ort.</p></div><button class="btn btn-primary desktop-action" id="libraryAdd">＋ Buch erfassen</button></div>
+        <div class="overview-cards" id="libraryOverview"></div>
+        <div class="toolbar"><div class="search-wrap"><span class="search-icon">⌕</span><input id="librarySearch" type="search" placeholder="Titel, Autor, Verlag oder Schlagwort …" aria-label="Bibliothek durchsuchen" /></div><div class="toolbar-second"><select id="libraryFilter" aria-label="Lesestatus filtern"><option value="all">Alle Lesestatus</option><option value="reading">Lese ich</option><option value="read">Gelesen</option><option value="dnf">Abgebrochen</option></select><select id="librarySort" aria-label="Sortierung"><option value="author">Autor A–Z</option><option value="title">Titel A–Z</option><option value="publisher">Verlag A–Z</option><option value="rating">Bewertung ↓</option><option value="recent">Zuletzt erfasst</option></select></div></div>
+        <div class="result-header"><h2 id="libraryResultLabel">Bücher</h2><span id="libraryResultCount" class="small-muted"></span></div>
+        <div id="libraryList" class="books-grid"></div>
+      </section>
+
+      <section class="view hidden" id="view-want">
+        <div class="heading-row"><div><p class="eyebrow">DEINE NÄCHSTEN ENTDECKUNGEN</p><h1>Want to Read<span class="heading-dot">.</span></h1><p class="subhead">Empfehlungen sammeln und später lesen.</p></div><button class="btn btn-primary desktop-action" id="wantAdd">＋ Buch merken</button></div>
+        <div class="info-strip"><span class="info-icon">✦</span><span>Empfehlungen aus unserem Literatur-Chat können per Link vorausgefüllt werden. Die Übernahme bestätigst du selbst.</span><button class="inline-action" id="wantChatHelp">So geht’s ↗</button></div>
+        <div class="toolbar"><div class="search-wrap"><span class="search-icon">⌕</span><input id="wantSearch" type="search" placeholder="Wunschliste durchsuchen …" aria-label="Wunschliste durchsuchen" /></div><div class="toolbar-second"><select id="wantSort" aria-label="Wunschliste sortieren"><option value="recent">Neueste zuerst</option><option value="author">Autor A–Z</option><option value="title">Titel A–Z</option></select></div></div>
+        <div class="result-header"><h2>Deine Merkliste</h2><span id="wantCount" class="small-muted"></span></div>
+        <div id="wantList" class="books-grid"></div>
+      </section>
+
+      <section class="view hidden" id="view-stats">
+        <div class="heading-row"><div><p class="eyebrow">DEIN LESEJAHR</p><h1>Deine Lesewelt<span class="heading-dot">.</span></h1><p class="subhead">Lesen und Hören auf einen Blick.</p></div><button id="statsAddSession" class="btn btn-primary desktop-action">＋ Aktivität erfassen</button></div>
+        <div class="period-control" role="group" aria-label="Statistikzeitraum"><button data-period="week" class="active">Woche</button><button data-period="month">Monat</button><button data-period="year">Jahr</button></div>
+        <div class="stats-cards" id="statsOverview"></div>
+        <div class="charts-grid"><div class="panel chart-panel"><div class="panel-heading"><div><h2>Gelesene Seiten</h2><p>Print & E-Books</p></div><span class="legend-dot green"></span></div><div id="pagesChart" class="chart"></div></div><div class="panel chart-panel"><div class="panel-heading"><div><h2>Gehörte Minuten</h2><p>Tatsächliche Hörzeit</p></div><span class="legend-dot terracotta"></span></div><div id="audioChart" class="chart"></div></div></div>
+        <div class="panel sessions-panel"><div class="panel-heading"><div><h2>Letzte Aktivitäten</h2><p>Deine protokollierten Lese- und Hörsitzungen</p></div><button id="allAddSession" class="text-button">＋ Erfassen</button></div><div id="sessionsList"></div></div>
+      </section>
+
+      <section class="view hidden" id="view-more">
+        <div class="heading-row"><div><p class="eyebrow">DEINE EINSTELLUNGEN</p><h1>Mehr & Daten<span class="heading-dot">.</span></h1><p class="subhead">Deine Bibliothek bleibt unter deiner Kontrolle.</p></div></div>
+        <div class="settings-grid">
+          <div class="panel settings-panel"><span class="settings-icon">↧</span><h2>Bibliothek sichern</h2><p>Exportiere alle Bücher, Schlagworte, Bewertungen, Ausleihen und Aktivitäten in einer JSON-Datei.</p><button id="exportJson" class="btn btn-primary">JSON-Backup erstellen</button></div>
+          <div class="panel settings-panel"><span class="settings-icon">↥</span><h2>Backup wiederherstellen</h2><p>Importiere eine zuvor exportierte JSON-Datei. Die aktuelle Sammlung wird dabei ersetzt.</p><label class="btn btn-light file-btn">JSON-Backup importieren <input id="importJson" type="file" accept=".json,application/json" hidden /></label></div>
+          <div class="panel settings-panel"><span class="settings-icon">▤</span><h2>CSV-Export</h2><p>Exportiere deine Bücher als Tabelle für Excel und andere Bibliotheksprogramme.</p><button id="exportCsv" class="btn btn-light">Bücher als CSV speichern</button></div>
+          <div class="panel settings-panel"><span class="settings-icon">✦</span><h2>Mit ChatGPT nutzen</h2><p>Erstelle einen Text mit deinem App-Link, damit ChatGPT Empfehlungen als Übernahmelinks ausgeben kann.</p><button id="copyChatSetup" class="btn btn-light">Chat-Vorlage kopieren</button><button id="copyLibraryList" class="text-button left-link">Bibliotheksliste für Chat kopieren</button></div>
+          <div class="panel settings-panel full-width notice-panel"><h2>Datenspeicherung in Version 1</h2><p>Deine Bücher und Aktivitäten werden <strong>lokal auf diesem Gerät im Browser</strong> gespeichert. Es gibt noch keine Cloud-Synchronisierung, Nutzerkonten oder direkte ChatGPT-Schreibschnittstelle. Ein gelöschter Browser-Datenspeicher kann deine Einträge entfernen – sichere deshalb regelmäßig eine JSON-Datei. ISBN-Suche und Online-Cover benötigen Internet.</p></div>
+          <div class="panel settings-panel"><h2>Zum Ausprobieren</h2><p>Du kannst eine kleine Demo-Sammlung mit Beispielaktivitäten laden, um die Ansichten und Diagramme zu testen.</p><button id="loadDemo" class="btn btn-light">Beispieldaten laden</button></div>
+          <div class="panel settings-panel"><h2>App installieren</h2><p>Öffne die veröffentlichte App in Safari, tippe auf „Teilen“ und anschließend „Zum Home-Bildschirm“.</p><button id="copyAppUrl" class="btn btn-light">App-Adresse kopieren</button></div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <nav class="bottom-nav" aria-label="Hauptnavigation">
+    <button data-nav="library" class="active"><span class="nav-icon">▦</span><span>Sammlung</span></button>
+    <button data-nav="want"><span class="nav-icon">♧</span><span>Merkliste</span></button>
+    <button id="mobileAdd" class="nav-add" aria-label="Buch hinzufügen"><span>＋</span></button>
+    <button data-nav="stats"><span class="nav-icon">▥</span><span>Statistik</span></button>
+    <button data-nav="more"><span class="nav-icon">⚙</span><span>Mehr</span></button>
+  </nav>
+</div>
+
+<div id="overlay" class="overlay hidden" role="presentation"></div>
+<section class="sheet hidden" id="bookSheet" role="dialog" aria-modal="true" aria-labelledby="bookSheetTitle">
+  <div class="sheet-top"><div><p class="eyebrow">BUCHDETAILS</p><h2 id="bookSheetTitle">Buch hinzufügen</h2></div><button class="close-btn" data-close="bookSheet" aria-label="Schließen">×</button></div>
+  <div class="sheet-body"><form id="bookForm">
+    <input type="hidden" id="bookId" />
+    <div class="scan-box"><label for="isbnInput">ISBN / EAN</label><div class="isbn-row"><input id="isbnInput" inputmode="numeric" autocomplete="off" placeholder="ISBN-13 oder ISBN-10" /><button type="button" id="findIsbn" class="btn btn-dark">Suchen</button><button type="button" id="scanIsbn" class="square-action" title="Barcode scannen" aria-label="Barcode scannen">▣</button></div><p class="field-hint">Buchdaten werden online aus Open Library geladen, soweit verfügbar.</p></div>
+    <div class="cover-and-fields"><div class="cover-editor"><img id="coverPreview" alt="Buchcover" class="hidden" /><span id="coverPlaceholder">Cover</span><label class="cover-upload">Bild wählen<input id="coverFile" type="file" accept="image/*" hidden /></label></div><div class="stacked-fields"><div class="field"><label for="titleInput">Buchtitel *</label><input id="titleInput" required placeholder="Titel" /></div><div class="field"><label for="firstNameInput">Autor – Vorname</label><input id="firstNameInput" placeholder="Vorname" /></div><div class="field"><label for="lastNameInput">Autor – Nachname</label><input id="lastNameInput" placeholder="Nachname" /></div></div></div>
+    <div class="two-col"><div class="field"><label for="publisherInput">Verlag</label><input id="publisherInput" placeholder="Verlag" /></div><div class="field"><label for="yearInput">Erscheinungsjahr</label><input id="yearInput" inputmode="numeric" type="number" min="0" max="2200" placeholder="Jahr" /></div></div>
+    <div class="two-col"><div class="field"><label for="formatInput">Format</label><select id="formatInput"><option value="print">Gedrucktes Buch</option><option value="ebook">E-Book</option><option value="audio">Hörbuch</option></select></div><div class="field"><label for="readStatusInput">Lesestatus</label><select id="readStatusInput"><option value="want">Want to Read</option><option value="reading">Lese ich / Höre ich</option><option value="read">Gelesen / Gehört</option><option value="dnf">Abgebrochen</option></select></div></div>
+    <div class="two-col"><div class="field"><label for="pagesInput">Gesamtseiten</label><input id="pagesInput" type="number" min="0" placeholder="z. B. 384" /></div><div class="field"><label for="audioTotalInput">Hörbuchdauer (Min.)</label><input id="audioTotalInput" type="number" min="0" placeholder="z. B. 620" /></div></div>
+    <div class="two-col"><div class="field"><label for="currentPageInput">Aktuelle Seite</label><input id="currentPageInput" type="number" min="0" placeholder="0" /></div><div class="field"><label for="currentAudioInput">Hörposition (Min.)</label><input id="currentAudioInput" type="number" min="0" placeholder="0" /></div></div>
+    <div class="field"><label for="tagsInput">Schlagworte</label><input id="tagsInput" placeholder="Literatur, Japan, Gegenwart …" /><p class="field-hint">Mehrere Schlagworte mit Kommas trennen.</p></div>
+    <div class="field"><label for="notesInput">Notizen</label><textarea id="notesInput" rows="3" placeholder="Eigene Gedanken oder Hinweise …"></textarea></div>
+    <div class="field"><div class="label-row"><label for="ratingInput">Meine Bewertung</label><strong id="ratingValue">Nicht bewertet</strong></div><input id="ratingInput" type="range" min="0" max="10" step="1" value="0" /><div id="ratingStars" class="star-line" aria-hidden="true"></div></div>
+    <div class="divider-line"></div>
+    <div class="field"><label for="loanInput">Ausleihstatus</label><select id="loanInput"><option value="home">Bei mir / nicht verliehen</option><option value="lent">Von mir verliehen</option><option value="borrowed">Von jemandem geliehen</option></select></div>
+    <div id="loanFields" class="hidden"><div class="field"><label for="loanPersonInput">Person</label><input id="loanPersonInput" placeholder="Name" /></div><div class="two-col"><div class="field"><label for="loanDateInput">Ausleihdatum</label><input id="loanDateInput" type="date" /></div><div class="field"><label for="loanDueInput">Rückgabe geplant</label><input id="loanDueInput" type="date" /></div></div></div>
+    <div class="sheet-actions"><button type="button" id="deleteBook" class="btn btn-danger hidden">Löschen</button><button type="submit" class="btn btn-primary btn-fill">Buch speichern</button></div>
+  </form></div>
+</section>
+
+<section class="sheet hidden" id="detailSheet" role="dialog" aria-modal="true" aria-labelledby="detailTitle"><div class="sheet-top"><div><p class="eyebrow">MEIN BUCHEINTRAG</p><h2 id="detailTitle">Buch</h2></div><button class="close-btn" data-close="detailSheet" aria-label="Schließen">×</button></div><div class="sheet-body" id="detailContent"></div></section>
+
+<section class="sheet small-sheet hidden" id="sessionSheet" role="dialog" aria-modal="true" aria-labelledby="sessionTitle"><div class="sheet-top"><div><p class="eyebrow">LESETAGEBUCH</p><h2 id="sessionTitle">Aktivität erfassen</h2></div><button class="close-btn" data-close="sessionSheet" aria-label="Schließen">×</button></div><div class="sheet-body"><form id="sessionForm"><div class="field"><label for="sessionBook">Buch *</label><select id="sessionBook" required></select></div><div class="two-col"><div class="field"><label for="sessionType">Art</label><select id="sessionType"><option value="read">Lesen</option><option value="listen">Hören</option></select></div><div class="field"><label for="sessionDate">Datum</label><input type="date" id="sessionDate" required /></div></div><div class="two-col"><div class="field"><label for="sessionAmount" id="sessionAmountLabel">Gelesene Seiten</label><input type="number" id="sessionAmount" min="1" step="1" required placeholder="z. B. 30" /></div><div class="field"><label for="sessionDuration" id="sessionDurationLabel">Zeitaufwand (Min.)</label><input type="number" id="sessionDuration" min="0" step="1" placeholder="optional" /></div></div><p class="field-hint" id="sessionHelp">Die Seiten erhöhen automatisch den Lesefortschritt des Buches.</p><div class="field"><label for="sessionNote">Notiz (optional)</label><textarea id="sessionNote" rows="2" placeholder="Wie war die Sitzung?"></textarea></div><button type="submit" class="btn btn-primary btn-fill">Aktivität speichern</button></form></div></section>
+
+<section class="sheet small-sheet hidden" id="scannerSheet" role="dialog" aria-modal="true" aria-labelledby="scannerTitle"><div class="sheet-top"><div><p class="eyebrow">ISBN ERKENNEN</p><h2 id="scannerTitle">Barcode scannen</h2></div><button class="close-btn" data-close="scannerSheet" aria-label="Schließen">×</button></div><div class="sheet-body"><div class="scanner-frame"><video id="scannerVideo" playsinline autoplay muted></video><span class="scanner-target"></span></div><p id="scannerMessage" class="field-hint">Richte die Kamera auf den ISBN-Barcode auf der Buchrückseite.</p><label class="btn btn-light file-btn">Stattdessen Barcode-Foto auswählen<input type="file" id="barcodePhoto" accept="image/*" capture="environment" hidden /></label></div></section>
+<div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
+<script src="app.js" defer></script>
+</body>
+</html>
