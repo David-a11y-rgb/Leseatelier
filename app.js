@@ -139,7 +139,7 @@ async function lookupMedimopsEditions(book,language){
   const work=await medimopsWorkKey(book);
   if(!work)return [];
   const editions=await fetchCoverJson('https://openlibrary.org'+work+'/editions.json?limit=250');
-  const pool=(editions.entries||[]).filter(e=>editionLanguage(e)===language && e.title);
+  const pool=(editions.entries||[]).filter(e=>editionLanguage(e)===language && canImportCatalogText(e.title));
   const queryTitle=normalizedCoverText(book.title);
   const results=[],seen=new Set();
   for(const e of pool){
@@ -225,7 +225,7 @@ async function onBookSave(e){e.preventDefault();const title=$('titleInput').valu
 async function deleteBook(){const b=data.books.find(b=>b.id===activeBookId);if(!b)return;if(!confirm(`„${b.title}“ einschließlich zugehöriger Aktivitäten wirklich löschen?`))return;data.books=data.books.filter(x=>x.id!==b.id);data.sessions=data.sessions.filter(s=>s.bookId!==b.id);await save();closeSheets();render();toast('Buch gelöscht.');}
 function showDetail(bookId){const b=data.books.find(x=>x.id===bookId);if(!b)return;activeBookId=bookId;$('detailTitle').textContent='Buchdetails';const p=Number(b.format==='audio'?b.currentAudio:b.currentPage)||0,max=Number(b.format==='audio'?b.audioTotal:b.pages)||0;const percent=max?Math.min(100,Math.round((p/max)*100)):0;
   const rating=b.rating?`<p class="rating-small" style="font-size:14px">${'★'.repeat(b.rating)}${'☆'.repeat(10-b.rating)} · ${b.rating}/10</p>`:'';
-  const details=`<div class="detail-head">${coverHtml(b)}<div class="detail-meta"><h3>${esc(b.title)}</h3><p>${esc(displayAuthor(b))}</p><p>${esc([b.publisher,b.year].filter(Boolean).join(' · '))}</p><p>${esc(FORMAT[b.format]||'Buch')} · <span class="status-badge ${esc(b.status)}">${esc(STATUS[b.status]||'Offen')}</span></p>${rating}</div></div>
+  const details=`<div class="detail-head"><div class="detail-cover-col">${coverHtml(b)}<button type="button" class="detail-cover-action" data-detail-cover="${esc(b.id)}">Cover ändern</button></div><div class="detail-meta"><h3>${esc(b.title)}</h3><p>${esc(displayAuthor(b))}</p><p>${esc([b.publisher,b.year].filter(Boolean).join(' · '))}</p><p>${esc(FORMAT[b.format]||'Buch')} · <span class="status-badge ${esc(b.status)}">${esc(STATUS[b.status]||'Offen')}</span></p>${rating}</div></div>
     <div class="detail-section"><h3>Lesefortschritt</h3>${max?`<div class="detail-progress"><div style="width:${percent}%"></div></div><p class="book-author">${fmtNum(p)} von ${fmtNum(max)} ${b.format==='audio'?'Minuten':'Seiten'} · ${percent}%</p>`:'<p class="book-author">Noch keine Gesamtseitenzahl oder Hörbuchdauer hinterlegt.</p>'}<button class="btn btn-light" data-detail-session="${esc(b.id)}">＋ Lese- / Höraktivität erfassen</button></div>
     <div class="detail-section"><h3>Schlagworte</h3><div class="detail-tags">${(b.tags||[]).length?(b.tags||[]).map(t=>`<span class="chip">${esc(t)}</span>`).join(''):'<span class="book-author">Noch keine Schlagworte</span>'}</div></div>
     ${b.loan!=='home'?`<div class="detail-section"><h3>Ausleihstatus</h3><p class="book-author">${b.loan==='lent'?'Verliehen an':'Geliehen von'}: ${esc(b.loanPerson||'unbekannt')} ${b.loanDue?`· Rückgabe: ${fmtDay(b.loanDue)}`:''}</p></div>`:''}
@@ -234,21 +234,47 @@ function showDetail(bookId){const b=data.books.find(x=>x.id===bookId);if(!b)retu
     <div class="detail-actions"><button class="btn btn-primary" data-detail-edit="${esc(b.id)}">Bearbeiten</button>${b.status==='want'?`<button class="btn btn-light" data-detail-start="${esc(b.id)}">Jetzt lesen / hören</button>`:`<button class="btn btn-light" data-detail-want="${esc(b.id)}">Auf Merkliste setzen</button>`}${b.status!=='read'?`<button class="btn btn-light" data-detail-finish="${esc(b.id)}">Als gelesen markieren</button>`:''}</div>`;
   $('detailContent').innerHTML=details;openSheet('detailSheet');}
 async function updateBookStatus(bookId,status){const b=data.books.find(x=>x.id===bookId);if(!b)return;b.status=status;b.finishedAt=status==='read'?localDay():null;await save();closeSheets();render();toast('Lesestatus geändert.');}
+
+/* External catalogues sometimes include entries in unrelated scripts.
+   Do not alter the user's own titles or notes. */
+function hasCyrillicText(value){
+  return /[\u0400-\u052f]/u.test(String(value||''));
+}
+function canImportCatalogText(value){
+  return typeof value==='string' && value.trim() && !hasCyrillicText(value);
+}
+async function latinEditionByIsbn(isbn){
+  try{
+    const result=await fetchCoverJson('https://www.googleapis.com/books/v1/volumes?'+
+      new URLSearchParams({q:'isbn:'+isbn,maxResults:'10',printType:'books'}));
+    const entry=(result.items||[]).map(x=>x.volumeInfo||{}).find(x=>
+      ['de','en'].includes(x.language) && canImportCatalogText(x.title) &&
+      (!x.authors?.length || x.authors.some(canImportCatalogText)));
+    return entry||null;
+  }catch(_){return null;}
+}
 async function lookupISBN(){const isbn=$('isbnInput').value.replace(/[-\s]/g,'');if(!/^(?:\d{9}[\dXx]|\d{13})$/.test(isbn)){toast('Bitte eine gültig formatierte ISBN-10 oder ISBN-13 eingeben.',true);return;}
   const button=$('findIsbn');button.disabled=true;button.textContent='Suche …';
   try{const controller=new AbortController();const timeout=setTimeout(()=>controller.abort(),12000);
     let response;try{response=await fetch(`https://openlibrary.org/search.json?isbn=${encodeURIComponent(isbn)}&fields=title,author_name,publisher,first_publish_year,cover_i,number_of_pages_median&limit=1`,{signal:controller.signal});}finally{clearTimeout(timeout);}
     if(!response.ok)throw Error('HTTP '+response.status);const json=await response.json();const rec=json.docs?.[0];if(!rec){toast('Keine Buchdaten zu dieser ISBN gefunden.',true);void searchCoverForm();return;}
-    if(rec.title)$('titleInput').value=rec.title;
-    if(rec.author_name?.[0]){const parts=rec.author_name[0].split(/\s+/);$('lastNameInput').value=parts.pop()||'';$('firstNameInput').value=parts.join(' ');}
-    if(rec.publisher?.[0])$('publisherInput').value=rec.publisher[0];
+    const foreignScript=[rec.title,rec.author_name?.[0],rec.publisher?.[0]].some(hasCyrillicText);
+    const germanOrEnglish=foreignScript?await latinEditionByIsbn(isbn):null;
+    const title=canImportCatalogText(rec.title)?rec.title:germanOrEnglish?.title;
+    const author=canImportCatalogText(rec.author_name?.[0])?rec.author_name[0]:
+      (germanOrEnglish?.authors||[]).find(canImportCatalogText);
+    const publisher=canImportCatalogText(rec.publisher?.[0])?rec.publisher[0]:
+      (canImportCatalogText(germanOrEnglish?.publisher)?germanOrEnglish.publisher:null);
+    if(title)$('titleInput').value=title;
+    if(author){const parts=author.split(/\s+/);$('lastNameInput').value=parts.pop()||'';$('firstNameInput').value=parts.join(' ');}
+    if(publisher)$('publisherInput').value=publisher;
     if(rec.first_publish_year)$('yearInput').value=rec.first_publish_year;
     if(rec.number_of_pages_median)$('pagesInput').value=rec.number_of_pages_median;
     if(rec.cover_i){setCover(`https://covers.openlibrary.org/b/id/${encodeURIComponent(rec.cover_i)}-M.jpg`);}else void searchCoverForm();
-    toast('Buchdaten gefunden. Bitte Ausgabe und Verlag prüfen.');
+    toast(foreignScript?'Buchdaten in kyrillischer Schrift wurden nicht übernommen. Bitte Titel, Autor und Verlag prüfen.':'Buchdaten gefunden. Bitte Ausgabe und Verlag prüfen.',foreignScript);
   }catch(e){toast('Buchdaten aktuell nicht abrufbar. Du kannst alles manuell erfassen.',true);}finally{button.disabled=false;button.textContent='Suchen';}}
 function setCover(src){const safe=cleanUrl(src);$('coverPreview').dataset.cover=safe;if(safe)$('coverPreview').src=safe;else $('coverPreview').removeAttribute('src');$('coverPreview').classList.toggle('hidden',!safe);$('coverPlaceholder').classList.toggle('hidden',!!safe);}
-async function coverFromFile(file){if(!file||!file.type.startsWith('image/'))return;try{const url=URL.createObjectURL(file);const image=new Image();await new Promise((res,rej)=>{image.onload=res;image.onerror=rej;image.src=url;});const canvas=document.createElement('canvas');const scale=Math.min(1,250/image.naturalWidth,370/image.naturalHeight);canvas.width=Math.max(1,Math.round(image.naturalWidth*scale));canvas.height=Math.max(1,Math.round(image.naturalHeight*scale));canvas.getContext('2d').drawImage(image,0,0,canvas.width,canvas.height);URL.revokeObjectURL(url);setCover(canvas.toDataURL('image/jpeg',0.74));toast('Cover gespeichert. Die automatische Cover-Erkennung folgt in einer späteren Version.');}catch(_){toast('Bild konnte nicht verarbeitet werden.',true);}}
+async function coverFromFile(file){if(!file||!file.type.startsWith('image/'))return;try{const url=URL.createObjectURL(file);const image=new Image();await new Promise((res,rej)=>{image.onload=res;image.onerror=rej;image.src=url;});const canvas=document.createElement('canvas');const scale=Math.min(1,250/image.naturalWidth,370/image.naturalHeight);canvas.width=Math.max(1,Math.round(image.naturalWidth*scale));canvas.height=Math.max(1,Math.round(image.naturalHeight*scale));canvas.getContext('2d').drawImage(image,0,0,canvas.width,canvas.height);URL.revokeObjectURL(url);setCover(canvas.toDataURL('image/jpeg',0.74));toast('Neues Cover ausgewählt. Bitte Buch speichern, um die Änderung zu übernehmen.');}catch(_){toast('Bild konnte nicht verarbeitet werden.',true);}}
 
 /* Online book-cover catalogue lookup — ISBN first, then title/author. */
 function coverQueryFromForm(){
@@ -288,7 +314,7 @@ async function findCoverCandidates(q){
   if(!q.title&&!q.isbn)return [];
   const covers=[],tasks=[],isbn=String(q.isbn||'').replace(/[-\s]/g,'');
   function add(item){
-    if(!item.url)return;
+    if(!item.url || hasCyrillicText(item.title) || hasCyrillicText(item.author))return;
     item.url=String(item.url).replace(/^http:\/\//,'https://');
     if(!/^https:\/\//.test(item.url))return;
     item.isbns=(item.isbns||[]).map(v=>String(v).replace(/[-\s]/g,''));
@@ -610,7 +636,7 @@ function attach(){for(const b of document.querySelectorAll('[data-nav]'))b.addEv
   for(const field of ['isbnInput','titleInput','firstNameInput','lastNameInput']){
     $(field).addEventListener('change',scheduleCoverLookup);
   }$('barcodePhoto').onchange=e=>barcodeFromPhoto(e.target.files?.[0]);
-  $('detailContent').addEventListener('click',e=>{const el=e.target.closest('button[data-detail-edit],button[data-detail-session],button[data-detail-want],button[data-detail-start],button[data-detail-finish]');if(!el)return;const bid=Object.values(el.dataset)[0];const b=data.books.find(x=>x.id===bid);if(!b)return;closeSheets();if(el.dataset.detailEdit)initBookForm(b);else if(el.dataset.detailSession)openSession(bid);else if(el.dataset.detailWant)updateBookStatus(bid,'want');else if(el.dataset.detailStart)updateBookStatus(bid,'reading');else if(el.dataset.detailFinish)updateBookStatus(bid,'read');});
+  $('detailContent').addEventListener('click',e=>{const el=e.target.closest('button[data-detail-edit],button[data-detail-cover],button[data-detail-session],button[data-detail-want],button[data-detail-start],button[data-detail-finish]');if(!el)return;const bid=Object.values(el.dataset)[0];const b=data.books.find(x=>x.id===bid);if(!b)return;closeSheets();if(el.dataset.detailEdit)initBookForm(b);else if(el.dataset.detailCover){initBookForm(b);$('coverInfo').textContent='Du kannst ein neues Bild auswählen oder online nach einer anderen Ausgabe suchen. Speichere anschließend das Buch.';}else if(el.dataset.detailSession)openSession(bid);else if(el.dataset.detailWant)updateBookStatus(bid,'want');else if(el.dataset.detailStart)updateBookStatus(bid,'reading');else if(el.dataset.detailFinish)updateBookStatus(bid,'read');});
   $('statsAddSession').onclick=()=>openSession();$('allAddSession').onclick=()=>openSession();$('sessionBook').onchange=()=>{$('sessionType').value=data.books.find(b=>b.id===$('sessionBook').value)?.format==='audio'?'listen':'read';updateSessionFields();};$('sessionType').onchange=updateSessionFields;$('sessionForm').onsubmit=submitSession;$('sessionsList').addEventListener('click',e=>{const b=e.target.closest('[data-delete-session]');if(b)removeSession(b.dataset.deleteSession);});
   $('exportJson').onclick=exportJson;$('exportCsv').onclick=exportCsv;$('importJson').onchange=e=>{importJson(e.target.files?.[0]);e.target.value='';};$('copyChatSetup').onclick=()=>copyText(chatSetup());$('copyLibraryList').onclick=()=>copyText(libraryListForChat());$('copyAppUrl').onclick=()=>copyText(appUrl());$('loadDemo').onclick=loadDemo;$('fillCovers').onclick=()=>void fillMissingCovers();}
 async function init(){data=await load();attach();render();urlImport();if('serviceWorker' in navigator && (location.protocol==='https:'||location.hostname==='localhost')){navigator.serviceWorker.register('./sw.js').catch(()=>{});}}
