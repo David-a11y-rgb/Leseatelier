@@ -4,8 +4,8 @@ const $ = (id) => document.getElementById(id);
 const STORE = 'leseatelier_v1';
 const KEY = 'main';
 let data = { schema: 1, books: [], sessions: [] };
-let view = 'library', statsPeriod = 'week', activeBookId = null;
-let scanStream = null, scanTimer = null, scanning = false;
+let view = 'library', statsPeriod = 'week', statsAnchor = new Date(), activeBookId = null;
+let html5Scanner = null, scannerLoadPromise = null, scanSession = 0;
 const STATUS = { want: 'Want to Read', reading: 'Lese ich', read: 'Gelesen', dnf: 'Abgebrochen' };
 const FORMAT = { print: 'Buch', ebook: 'E-Book', audio: 'Hörbuch' };
 const dbPromise = (() => {
@@ -64,7 +64,7 @@ function fmtNum(n){return new Intl.NumberFormat('de-DE',{maximumFractionDigits:1
 function fmtDay(iso){if(!iso)return '';try{return new Intl.DateTimeFormat('de-DE',{day:'2-digit',month:'short',year:'numeric'}).format(parseDay(iso));}catch(_){return iso;}}
 function toast(message,error=false){const el=$('toast');el.textContent=message;el.classList.remove('hidden');el.classList.toggle('error',error);clearTimeout(toast.timer);toast.timer=setTimeout(()=>el.classList.add('hidden'),4200);}
 function openSheet(sheet){$('overlay').classList.remove('hidden');$(sheet).classList.remove('hidden');document.body.style.overflow='hidden';}
-function stopScan(){if(scanTimer)clearInterval(scanTimer);scanTimer=null;scanStream?.getTracks().forEach(t=>t.stop());scanStream=null;scanning=false;$('scannerVideo').srcObject=null;}
+async function stopScan(){scanSession++;const scanner=html5Scanner;html5Scanner=null;if(scanner){try{await scanner.stop();}catch(_){}try{scanner.clear();}catch(_){}}}
 function closeSheets(){stopScan();for(const el of document.querySelectorAll('.sheet'))el.classList.add('hidden');$('overlay').classList.add('hidden');document.body.style.overflow='';}
 function showView(next){closeSheets();view=next;for(const s of document.querySelectorAll('.view')) s.classList.toggle('hidden',s.id!==`view-${next}`);for(const b of document.querySelectorAll('[data-nav]')){const current=b.dataset.nav===next;b.classList.toggle('active',current);if(current)b.setAttribute('aria-current','page');else b.removeAttribute('aria-current');}render();window.scrollTo({top:0,behavior:'instant'});}
 function displayAuthor(b){return [b.authorFirst,b.authorLast].filter(Boolean).join(' ') || 'Autor unbekannt';}
@@ -122,29 +122,117 @@ async function lookupISBN(){const isbn=$('isbnInput').value.replace(/[-\s]/g,'')
   }catch(e){toast('Buchdaten aktuell nicht abrufbar. Du kannst alles manuell erfassen.',true);}finally{button.disabled=false;button.textContent='Suchen';}}
 function setCover(src){const safe=cleanUrl(src);$('coverPreview').dataset.cover=safe;if(safe)$('coverPreview').src=safe;else $('coverPreview').removeAttribute('src');$('coverPreview').classList.toggle('hidden',!safe);$('coverPlaceholder').classList.toggle('hidden',!!safe);}
 async function coverFromFile(file){if(!file||!file.type.startsWith('image/'))return;try{const url=URL.createObjectURL(file);const image=new Image();await new Promise((res,rej)=>{image.onload=res;image.onerror=rej;image.src=url;});const canvas=document.createElement('canvas');const scale=Math.min(1,250/image.naturalWidth,370/image.naturalHeight);canvas.width=Math.max(1,Math.round(image.naturalWidth*scale));canvas.height=Math.max(1,Math.round(image.naturalHeight*scale));canvas.getContext('2d').drawImage(image,0,0,canvas.width,canvas.height);URL.revokeObjectURL(url);setCover(canvas.toDataURL('image/jpeg',0.74));toast('Cover gespeichert. Die automatische Cover-Erkennung folgt in einer späteren Version.');}catch(_){toast('Bild konnte nicht verarbeitet werden.',true);}}
-async function openScanner(){openSheet('scannerSheet');$('scannerMessage').textContent='Richte die Kamera auf den ISBN-Barcode auf der Buchrückseite.';if(!('BarcodeDetector'in window)){ $('scannerMessage').textContent='Automatische Barcode-Erkennung ist in diesem Browser nicht verfügbar. Nutze die ISBN-Eingabe oder die iPhone-Texterkennung.';return;}
-  if(!navigator.mediaDevices?.getUserMedia){$('scannerMessage').textContent='Kamerazugriff ist nur bei sicherer HTTPS-Verbindung möglich.';return;}
-  try{const detector=new BarcodeDetector({formats:['ean_13','ean_8','code_128']});scanStream=await navigator.mediaDevices.getUserMedia({audio:false,video:{facingMode:{ideal:'environment'},width:{ideal:1280},height:{ideal:720}}});$('scannerVideo').srcObject=scanStream;await $('scannerVideo').play();
-    scanTimer=setInterval(async()=>{if(scanning||$('scannerSheet').classList.contains('hidden')||$('scannerVideo').readyState<2)return;scanning=true;try{const codes=await detector.detect($('scannerVideo'));const barcode=codes.map(c=>c.rawValue.replace(/\D/g,'')).find(s=>/^(978|979)\d{10}$/.test(s));if(barcode){closeSheets();$('isbnInput').value=barcode;openSheet('bookSheet');toast('ISBN erkannt: '+barcode);lookupISBN();}}catch(_){ }finally{scanning=false;}},350);
-  }catch(e){stopScan();$('scannerMessage').textContent='Kamera konnte nicht gestartet werden. Prüfe die Freigabe in Safari oder erfasse die ISBN manuell.';}}
-async function barcodeFromPhoto(file){if(!file)return;if(!('BarcodeDetector'in window)){toast('Barcode-Erkennung wird hier nicht unterstützt.',true);return;}try{const bitmap=await createImageBitmap(file);const codes=await new BarcodeDetector({formats:['ean_13','ean_8','code_128']}).detect(bitmap);bitmap.close?.();const isbn=codes.map(x=>x.rawValue.replace(/\D/g,'')).find(s=>/^(978|979)\d{10}$/.test(s));if(!isbn){toast('Keine ISBN im Foto erkannt.',true);return;}closeSheets();$('isbnInput').value=isbn;openSheet('bookSheet');lookupISBN();}catch(e){toast('Barcode konnte nicht gelesen werden.',true);}}
+function loadScannerLibrary(){
+  if(window.Html5Qrcode)return Promise.resolve();
+  if(!scannerLoadPromise){
+    scannerLoadPromise=new Promise((resolve,reject)=>{
+      const script=document.createElement('script');
+      script.src='https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js';
+      script.async=true;
+      script.onload=()=>window.Html5Qrcode?resolve():reject(new Error('Scan-Bibliothek nicht verfügbar'));
+      script.onerror=()=>reject(new Error('Scan-Bibliothek konnte nicht geladen werden'));
+      document.head.append(script);
+    }).catch(e=>{scannerLoadPromise=null;throw e;});
+  }
+  return scannerLoadPromise;
+}
+function readIsbnBarcode(raw){
+  const digits=String(raw||'').replace(/\D/g,'');
+  return /^(978|979)\d{10}$/.test(digits)?digits:null;
+}
+function applyScannedIsbn(raw){
+  const isbn=readIsbnBarcode(raw);
+  if(!isbn)return false;
+  closeSheets();
+  $('isbnInput').value=isbn;
+  openSheet('bookSheet');
+  toast('ISBN erkannt: '+isbn);
+  lookupISBN();
+  return true;
+}
+async function openScanner(){
+  openSheet('scannerSheet');
+  $('scannerMessage').textContent='Kamera wird vorbereitet. Richte sie auf den Barcode auf der Buchrückseite.';
+  const token=++scanSession;
+  try{
+    if(!navigator.mediaDevices?.getUserMedia)throw new Error('Kamera ist nicht verfügbar');
+    await loadScannerLibrary();
+    if(token!==scanSession||$('scannerSheet').classList.contains('hidden'))return;
+    const scanner=new Html5Qrcode('scannerReader',{
+      formatsToSupport:[Html5QrcodeSupportedFormats.EAN_13,Html5QrcodeSupportedFormats.EAN_8,Html5QrcodeSupportedFormats.CODE_128],
+      experimentalFeatures:{useBarCodeDetectorIfSupported:false},verbose:false
+    });
+    html5Scanner=scanner;
+    await scanner.start({facingMode:'environment'},{fps:10,disableFlip:true},
+      value=>{if(token===scanSession)applyScannedIsbn(value);},
+      ()=>{});
+    if(token!==scanSession||$('scannerSheet').classList.contains('hidden')){
+      try{await scanner.stop();}catch(_){}
+      try{scanner.clear();}catch(_){}
+    }else $('scannerMessage').textContent='Richte den Barcode ruhig ins Bild. Alternativ kannst du ein Foto auswählen.';
+  }catch(e){
+    if(token!==scanSession)return;
+    await stopScan();
+    console.warn('Scanner:',e);
+    $('scannerMessage').textContent='Kamera-Scanner konnte nicht gestartet werden. Prüfe die Kamerafreigabe oder nutze „Barcode-Foto auswählen“. Eine Internetverbindung wird beim ersten Scan benötigt.';
+  }
+}
+async function barcodeFromPhoto(file){
+  if(!file)return;
+  const el=$('scannerMessage');
+  el.textContent='Barcode-Foto wird ausgewertet …';
+  await stopScan();
+  let scanner=null;
+  try{
+    await loadScannerLibrary();
+    scanner=new Html5Qrcode('scannerReader',{
+      formatsToSupport:[Html5QrcodeSupportedFormats.EAN_13,Html5QrcodeSupportedFormats.EAN_8,Html5QrcodeSupportedFormats.CODE_128],
+      experimentalFeatures:{useBarCodeDetectorIfSupported:false},verbose:false
+    });
+    const value=await scanner.scanFile(file,false);
+    if(!applyScannedIsbn(value))el.textContent='Im Foto wurde keine gültige ISBN erkannt. Bitte Barcode deutlich und gerade fotografieren.';
+  }catch(e){
+    console.warn('Barcode-Foto:',e);
+    el.textContent='ISBN auf dem Foto nicht erkannt. Versuche ein schärferes Foto oder gib die ISBN manuell ein.';
+  }finally{
+    if(scanner){try{scanner.clear();}catch(_){}}
+    $('barcodePhoto').value='';
+  }
+}
 function openSession(bookId=null){if(!data.books.length){toast('Lege zuerst ein Buch an.',true);initBookForm(null);return;}
   $('sessionForm').reset();$('sessionBook').innerHTML=data.books.map(b=>`<option value="${esc(b.id)}">${esc(b.title)} — ${esc(displayAuthor(b))}</option>`).join('');if(bookId&&data.books.some(x=>x.id===bookId))$('sessionBook').value=bookId;$('sessionDate').value=localDay();$('sessionType').value=(data.books.find(b=>b.id===$('sessionBook').value)?.format==='audio')?'listen':'read';updateSessionFields();openSheet('sessionSheet');}
 function updateSessionFields(){const listen=$('sessionType').value==='listen';$('sessionAmountLabel').textContent=listen?'Gehörte Minuten (reale Zeit)':'Gelesene Seiten';$('sessionDurationLabel').textContent=listen?'Hörbuchfortschritt (Min.)':'Lesezeit (Min.)';$('sessionHelp').textContent=listen?'Wichtig bei höherer Abspielgeschwindigkeit: In der Statistik zählt die reale Hörzeit, beim Buchfortschritt die Inhaltsdauer. Ohne zweiten Wert wird 1:1 gerechnet.':'Gelesene Seiten werden dem Buchfortschritt hinzugefügt. Die optionale Lesezeit kann für spätere Analysen erfasst werden.';}
 async function submitSession(e){e.preventDefault();const book=data.books.find(b=>b.id===$('sessionBook').value);if(!book)return;const amount=Number($('sessionAmount').value),duration=Number($('sessionDuration').value)||0;if(!Number.isFinite(amount)||amount<=0){toast('Bitte eine positive Menge eingeben.',true);return;}if(!/^\d{4}-\d{2}-\d{2}$/.test($('sessionDate').value)){toast('Bitte ein Datum eingeben.',true);return;}
   const type=$('sessionType').value;const s={id:id(),bookId:book.id,type,date:$('sessionDate').value,amount, duration,note:$('sessionNote').value.trim(),createdAt:new Date().toISOString()};data.sessions.push(s);if(type==='read'){book.currentPage=(Number(book.currentPage)||0)+amount;if(book.pages&&book.currentPage>=book.pages){book.currentPage=book.pages;book.status='read';book.finishedAt=s.date;}}else{book.currentAudio=(Number(book.currentAudio)||0)+(duration||amount);if(book.audioTotal&&book.currentAudio>=book.audioTotal){book.currentAudio=book.audioTotal;book.status='read';book.finishedAt=s.date;}}
-  if(book.status==='want')book.status='reading';await save();closeSheets();render();toast('Aktivität gespeichert.');}
+  if(book.status==='want')book.status='reading';await save();closeSheets();statsAnchor=parseDay(s.date);statsPeriod='week';document.querySelectorAll('[data-period]').forEach(el=>el.classList.toggle('active',el.dataset.period===statsPeriod));showView('stats');toast('Aktivität gespeichert und in der Statistik angezeigt.');}
 async function removeSession(sid){const s=data.sessions.find(x=>x.id===sid);if(!s)return;if(!confirm('Diese Aktivität entfernen? Der automatisch erfasste Fortschritt wird entsprechend korrigiert.'))return;const b=data.books.find(x=>x.id===s.bookId);if(b){if(s.type==='read')b.currentPage=Math.max(0,(Number(b.currentPage)||0)-s.amount);else b.currentAudio=Math.max(0,(Number(b.currentAudio)||0)-(s.duration||s.amount));}data.sessions=data.sessions.filter(x=>x.id!==sid);await save();render();toast('Aktivität entfernt.');}
-function rangeStats(){const today=new Date();let dataPoints=[];let inPeriod;
+function rangeStats(){const today=new Date(statsAnchor);let dataPoints=[];let inPeriod;
   if(statsPeriod==='week'){const day=(today.getDay()+6)%7;const start=addDays(new Date(today.getFullYear(),today.getMonth(),today.getDate()),-day);const labels=['Mo','Di','Mi','Do','Fr','Sa','So'];dataPoints=Array.from({length:7},(_,i)=>({key:localDay(addDays(start,i)),label:labels[i],pages:0,audio:0}));inPeriod=(d)=>d>=dataPoints[0].key&&d<=dataPoints[6].key;}
   else if(statsPeriod==='month'){const y=today.getFullYear(),m=today.getMonth(),days=new Date(y,m+1,0).getDate();const count=Math.ceil(days/7);dataPoints=Array.from({length:count},(_,i)=>({key:i,label:`${i*7+1}–${Math.min(days,i*7+7)}`,pages:0,audio:0}));inPeriod=d=>d.slice(0,7)===`${y}-${String(m+1).padStart(2,'0')}`;}
   else{const y=today.getFullYear(),names=['Jan','Feb','Mär','Apr','Mai','Jun','Jul','Aug','Sep','Okt','Nov','Dez'];dataPoints=names.map((name,i)=>({key:i,label:name,pages:0,audio:0}));inPeriod=d=>d.startsWith(`${y}-`);}
   const sessionRows=data.sessions.filter(s=>inPeriod(s.date));for(const s of sessionRows){let idx=0;if(statsPeriod==='week')idx=dataPoints.findIndex(p=>p.key===s.date);else if(statsPeriod==='month')idx=Math.floor((Number(s.date.slice(-2))-1)/7);else idx=Number(s.date.slice(5,7))-1;if(idx<0||idx>=dataPoints.length)continue;if(s.type==='read')dataPoints[idx].pages+=Number(s.amount)||0;else dataPoints[idx].audio+=Number(s.amount)||0;}
   return {dataPoints,sessionRows};}
+function statsPeriodLabel(){
+  const d=new Date(statsAnchor);
+  if(statsPeriod==='week'){
+    const day=(d.getDay()+6)%7;
+    const monday=addDays(d,-day);
+    return fmtDay(localDay(monday))+' – '+fmtDay(localDay(addDays(monday,6)));
+  }
+  if(statsPeriod==='month')return new Intl.DateTimeFormat('de-DE',{month:'long',year:'numeric'}).format(d);
+  return String(d.getFullYear());
+}
+function changeStatsAnchor(direction){
+  const d=new Date(statsAnchor);
+  if(statsPeriod==='week')statsAnchor=addDays(d,7*direction);
+  else if(statsPeriod==='month')statsAnchor=new Date(d.getFullYear(),d.getMonth()+direction,1);
+  else statsAnchor=new Date(d.getFullYear()+direction,0,1);
+  renderStats();
+}
 function chartSvg(points,key,color){const totals=points.map(p=>p[key]),max=Math.max(0,...totals);if(!max)return '<div class="chart-empty">Noch keine Aktivitäten in diesem Zeitraum.<br> Erfasse eine Sitzung, um das Diagramm zu füllen.</div>';
   const width=560,height=205,left=31,right=9,top=11,bottom=30,plotH=height-top-bottom,plotW=width-left-right,maxY=Math.ceil(max/10)*10||10,grid=[0,.25,.5,.75,1].map(step=>{const y=top+plotH*(1-step);return `<line x1="${left}" x2="${width-right}" y1="${y}" y2="${y}"/><text x="${left-7}" y="${y+3}" text-anchor="end">${Math.round(step*maxY)}</text>`;}).join('');
   const slot=plotW/points.length,bw=Math.min(48,slot*.58),bars=points.map((p,i)=>{const h=(p[key]/maxY)*plotH, x=left+i*slot+(slot-bw)/2,y=top+plotH-h;return `<rect class="${color==='green'?'bar-green':'bar-terra'}" x="${x}" y="${y}" width="${bw}" height="${h}" rx="5"><title>${esc(p.label)}: ${fmtNum(p[key])}</title></rect><text x="${left+i*slot+slot/2}" y="${height-9}" text-anchor="middle">${esc(p.label)}</text>`;}).join('');return `<svg viewBox="0 0 ${width} ${height}" preserveAspectRatio="none" role="img" aria-label="${key==='pages'?'Gelesene Seiten':'Gehörte Minuten'} nach Zeitraum">${grid}${bars}</svg>`;}
-function renderStats(){const {dataPoints,sessionRows}=rangeStats();const pages=sessionRows.filter(s=>s.type==='read').reduce((a,s)=>a+(Number(s.amount)||0),0),audio=sessionRows.filter(s=>s.type==='listen').reduce((a,s)=>a+(Number(s.amount)||0),0),days=new Set(sessionRows.map(s=>s.date)).size;
+function renderStats(){$('periodLabel').textContent=statsPeriodLabel();const {dataPoints,sessionRows}=rangeStats();const pages=sessionRows.filter(s=>s.type==='read').reduce((a,s)=>a+(Number(s.amount)||0),0),audio=sessionRows.filter(s=>s.type==='listen').reduce((a,s)=>a+(Number(s.amount)||0),0),days=new Set(sessionRows.map(s=>s.date)).size;
   $('statsOverview').innerHTML=[['▤','Seiten gelesen',fmtNum(pages),'Seiten'],['♫','Zeit gehört',fmtNum(audio),'Minuten'],['◷','Aktive Tage',fmtNum(days),'Tage']].map(([symbol,label,value,unit])=>`<div class="stat-card"><div class="stat-icon">${symbol}</div><div class="stat-label">${label}</div><div class="stat-value">${value}<span class="stat-unit">${unit}</span></div></div>`).join('');
   $('pagesChart').innerHTML=chartSvg(dataPoints,'pages','green');$('audioChart').innerHTML=chartSvg(dataPoints,'audio','terra');const recent=[...data.sessions].sort((a,b)=>b.date.localeCompare(a.date)||b.createdAt.localeCompare(a.createdAt)).slice(0,12);$('sessionsList').innerHTML=recent.length?recent.map(s=>{const b=data.books.find(x=>x.id===s.bookId);return `<div class="session-row"><div class="session-circle ${s.type==='listen'?'listen':''}">${s.type==='listen'?'♫':'▤'}</div><div class="session-desc"><strong>${esc(b?.title||'Entferntes Buch')}</strong><small>${fmtDay(s.date)}${s.note?' · '+esc(s.note):''}</small></div><div class="session-amount">+${fmtNum(s.amount)} ${s.type==='listen'?'Min.':'Seiten'}</div><button class="session-remove" data-delete-session="${esc(s.id)}" aria-label="Aktivität löschen" title="Aktivität löschen">×</button></div>`;}).join(''):'<div class="sessions-empty">Noch keine Aktivitäten erfasst.</div>';}
 function download(filename,content,mime){const blob=new Blob([content],{type:mime}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=filename;document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),3000);}
@@ -164,7 +252,7 @@ function loadDemo(){if(data.books.length||data.sessions.length){if(!confirm('Bei
 function urlImport(){const u=new URL(location.href);const title=u.searchParams.get('title');if(!title)return;const author=u.searchParams.get('author')||'';const isbn=u.searchParams.get('isbn')||'';initBookForm(null,u.searchParams.get('want')==='1');$('titleInput').value=title;const parts=author.trim().split(/\s+/);$('lastNameInput').value=parts.length?parts.pop():'';$('firstNameInput').value=parts.join(' ');$('isbnInput').value=isbn;history.replaceState({},'',location.pathname+location.hash);toast('Empfehlung vorausgefüllt. Bitte Angaben prüfen und speichern.');}
 function attach(){for(const b of document.querySelectorAll('[data-nav]'))b.addEventListener('click',()=>showView(b.dataset.nav));for(const b of ['desktopAdd','topAdd','libraryAdd','mobileAdd'])$(b).addEventListener('click',()=>initBookForm(null,view==='want'));$('wantAdd').onclick=()=>initBookForm(null,true);$('wantChatHelp').onclick=()=>{showView('more');$('copyChatSetup').scrollIntoView({behavior:'smooth',block:'center'});};
   for(const el of ['librarySearch','libraryFilter','librarySort','wantSearch','wantSort'])$(el).addEventListener(el.endsWith('Search')?'input':'change',render);
-  for(const b of document.querySelectorAll('[data-period]'))b.addEventListener('click',()=>{statsPeriod=b.dataset.period;document.querySelectorAll('[data-period]').forEach(x=>x.classList.toggle('active',x===b));renderStats();});
+  for(const b of document.querySelectorAll('[data-period]'))b.addEventListener('click',()=>{statsPeriod=b.dataset.period;document.querySelectorAll('[data-period]').forEach(x=>x.classList.toggle('active',x===b));renderStats();});$('periodPrevious').onclick=()=>changeStatsAnchor(-1);$('periodNext').onclick=()=>changeStatsAnchor(1);
   $('overlay').onclick=closeSheets;document.querySelectorAll('[data-close]').forEach(b=>b.onclick=closeSheets);document.addEventListener('keydown',e=>{if(e.key==='Escape')closeSheets();});
   for(const container of ['libraryList','wantList'])$(container).addEventListener('click',e=>{const add=e.target.closest('[data-add]');if(add){initBookForm(null,add.dataset.add==='want');return;}const book=e.target.closest('[data-book]');if(book)showDetail(book.dataset.book);});
   $('bookForm').onsubmit=onBookSave;$('deleteBook').onclick=deleteBook;$('ratingInput').oninput=updateRating;$('loanInput').onchange=updateLoan;$('findIsbn').onclick=lookupISBN;$('scanIsbn').onclick=openScanner;$('coverFile').onchange=e=>coverFromFile(e.target.files?.[0]);$('barcodePhoto').onchange=e=>barcodeFromPhoto(e.target.files?.[0]);
