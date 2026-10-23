@@ -251,3 +251,11 @@ body{background:var(--bg);color:var(--cream);}
   .field input:not([type=range]),.field textarea,
   .isbn-row input,select{font-size:16px!important;}
 }
+
+/* The cover is editable from every existing book detail view. */
+.detail-cover-col{width:116px;flex:0 0 116px;min-width:0;display:flex;flex-direction:column;gap:9px;}
+.detail-cover-col .book-cover,.detail-cover-col .cover-fallback{width:100%;height:165px;}
+.detail-cover-action{font-family:inherit;font-size:12px;line-height:1.25;font-weight:750;cursor:pointer;color:#173a32;
+  background:#e9b78f;border:1px solid #c79271;border-radius:9px;padding:9px 5px;min-height:42px;}
+.detail-cover-action:hover{background:#e8a67b;}
+.detail-cover-action:focus-visible{outline:3px solid #d7a638;outline-offset:2px;}
