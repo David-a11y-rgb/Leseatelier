@@ -19,11 +19,10 @@
   <aside class="side-nav">
     <div class="brand-side"><span class="brand-symbol">◧</span><span>Leseatelier</span></div>
     <div class="side-caption">MEINE BIBLIOTHEK</div>
-    <button class="side-link active" data-nav="library"><span>▦</span> Sammlung</button>
-    <button class="side-link" data-nav="want"><span>♧</span> Want to Read</button>
-    <button class="side-link" data-nav="stats"><span>▥</span> Statistiken</button>
-    <button class="side-link" data-nav="more"><span>⚙</span> Einstellungen</button>
-    <button class="sidebar-add" id="desktopAdd">＋ Buch hinzufügen</button>
+    <button class="side-link active" data-nav="library"><svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 7.2c-2.6-1.8-5.5-2.2-9-1.4V20c3.6-.9 6.5-.4 9 1.2 2.5-1.6 5.4-2.1 9-1.2V5.8c-3.5-.8-6.4-.4-9 1.4Z"/><path d="M12 7.2v14"/></svg> Sammlung</button>
+    <button class="side-link" data-nav="want"><svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4.5A2 2 0 0 1 8 2.5h8a2 2 0 0 1 2 2V22l-6-4-6 4V4.5Z"/></svg> Want to Read</button>
+    <button class="side-link" data-nav="stats"><svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 21V12"/><path d="M10 21V5"/><path d="M16 21v-8"/><path d="M22 21V9"/><path d="M2 21h20"/></svg> Statistiken</button>
+    <button class="side-link" data-nav="more"><svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="2.5"/><path d="M19.4 15a1.7 1.7 0 0 1 .3 1.8l-1 1.8a1.7 1.7 0 0 1-1.7.8l-1.7-.4a8 8 0 0 1-1.4.8L13.5 22h-3l-.4-2.2a8 8 0 0 1-1.4-.8L7 19.4a1.7 1.7 0 0 1-1.7-.8l-1-1.8a1.7 1.7 0 0 1 .3-1.8l1.3-1.2a8 8 0 0 1 0-1.6L4.6 11a1.7 1.7 0 0 1-.3-1.8l1-1.8A1.7 1.7 0 0 1 7 6.6l1.7.4a8 8 0 0 1 1.4-.8L10.5 4h3l.4 2.2a8 8 0 0 1 1.4.8l1.7-.4a1.7 1.7 0 0 1 1.7.8l1 1.8a1.7 1.7 0 0 1-.3 1.8L18.1 12a8 8 0 0 1 0 1.6L19.4 15Z"/></svg> Einstellungen</button>
     <p class="side-footer">Privat. Unabhängig. Dein Lesekosmos.</p>
   </aside>
 
@@ -31,11 +30,10 @@
     <header class="topbar">
       <div class="topbar-brand"><span class="brand-symbol">◧</span><span>Leseatelier</span></div>
       <span class="topbar-context">Deine persönliche Bibliothek</span>
-      <button class="round-btn topbar-add" id="topAdd" title="Buch hinzufügen" aria-label="Buch hinzufügen">＋</button>
     </header>
     <main class="main-container" id="main">
       <section class="view" id="view-library">
-        <div class="heading-row"><div><p class="eyebrow">DEINE SAMMLUNG</p><h1>Meine Bibliothek<span class="heading-dot">.</span></h1><p class="subhead" id="librarySubtitle">Alle Bücher an einem Ort.</p></div><button class="btn btn-primary desktop-action" id="libraryAdd">＋ Buch erfassen</button></div>
+        <div class="heading-row"><div><p class="eyebrow">DEINE SAMMLUNG</p><h1>Meine Bibliothek<span class="heading-dot">.</span></h1><p class="subhead" id="librarySubtitle">Alle Bücher an einem Ort.</p></div></div>
         <div class="overview-cards" id="libraryOverview"></div>
         <div class="toolbar"><div class="search-wrap"><span class="search-icon">⌕</span><input id="librarySearch" type="search" placeholder="Titel, Autor, Verlag oder Schlagwort …" aria-label="Bibliothek durchsuchen" /></div><div class="toolbar-second"><select id="libraryFilter" aria-label="Lesestatus filtern"><option value="all">Alle Lesestatus</option><option value="reading">Lese ich</option><option value="read">Gelesen</option><option value="dnf">Abgebrochen</option></select><select id="librarySort" aria-label="Sortierung"><option value="author">Autor A–Z</option><option value="title">Titel A–Z</option><option value="publisher">Verlag A–Z</option><option value="rating">Bewertung ↓</option><option value="recent">Zuletzt erfasst</option></select></div></div>
         <div class="result-header"><h2 id="libraryResultLabel">Bücher</h2><span id="libraryResultCount" class="small-muted"></span></div>
@@ -43,7 +41,7 @@
       </section>
 
       <section class="view hidden" id="view-want">
-        <div class="heading-row"><div><p class="eyebrow">DEINE NÄCHSTEN ENTDECKUNGEN</p><h1>Want to Read<span class="heading-dot">.</span></h1><p class="subhead">Empfehlungen sammeln und später lesen.</p></div><button class="btn btn-primary desktop-action" id="wantAdd">＋ Buch merken</button></div>
+        <div class="heading-row"><div><p class="eyebrow">DEINE NÄCHSTEN ENTDECKUNGEN</p><h1>Want to Read<span class="heading-dot">.</span></h1><p class="subhead">Empfehlungen sammeln und später lesen.</p></div></div>
         <div class="info-strip"><span class="info-icon">✦</span><span>Empfehlungen aus unserem Literatur-Chat können per Link vorausgefüllt werden. Die Übernahme bestätigst du selbst.</span><button class="inline-action" id="wantChatHelp">So geht’s ↗</button></div>
         <div class="toolbar"><div class="search-wrap"><span class="search-icon">⌕</span><input id="wantSearch" type="search" placeholder="Wunschliste durchsuchen …" aria-label="Wunschliste durchsuchen" /></div><div class="toolbar-second"><select id="wantSort" aria-label="Wunschliste sortieren"><option value="recent">Neueste zuerst</option><option value="author">Autor A–Z</option><option value="title">Titel A–Z</option></select></div></div>
         <div class="result-header"><h2>Deine Merkliste</h2><span id="wantCount" class="small-muted"></span></div>
@@ -51,7 +49,7 @@
       </section>
 
       <section class="view hidden" id="view-stats">
-        <div class="heading-row"><div><p class="eyebrow">DEIN LESEJAHR</p><h1>Deine Lesewelt<span class="heading-dot">.</span></h1><p class="subhead">Lesen und Hören auf einen Blick.</p></div><button id="statsAddSession" class="btn btn-primary desktop-action">＋ Aktivität erfassen</button></div>
+        <div class="heading-row"><div><p class="eyebrow">DEIN LESEJAHR</p><h1>Meine Statistik<span class="heading-dot">.</span></h1><p class="subhead">Lesen und Hören auf einen Blick.</p></div><button id="statsAddSession" class="btn btn-primary desktop-action">＋ Aktivität erfassen</button></div>
         <div class="period-control" role="group" aria-label="Statistikzeitraum"><button data-period="week" class="active">Woche</button><button data-period="month">Monat</button><button data-period="year">Jahr</button></div><div class="period-navigation"><button id="periodPrevious" type="button" class="btn btn-light" aria-label="Vorheriger Zeitraum">← Früher</button><span id="periodLabel" aria-live="polite"></span><button id="periodNext" type="button" class="btn btn-light" aria-label="Nächster Zeitraum">Später →</button></div>
         <div class="stats-cards" id="statsOverview"></div>
         <div class="charts-grid"><div class="panel chart-panel"><div class="panel-heading"><div><h2>Gelesene Seiten</h2><p>Print & E-Books</p></div><span class="legend-dot green"></span></div><div id="pagesChart" class="chart"></div></div><div class="panel chart-panel"><div class="panel-heading"><div><h2>Gehörte Minuten</h2><p>Tatsächliche Hörzeit</p></div><span class="legend-dot terracotta"></span></div><div id="audioChart" class="chart"></div></div></div>
@@ -63,6 +61,7 @@
         <div class="settings-grid">
           <div class="panel settings-panel"><span class="settings-icon">↧</span><h2>Bibliothek sichern</h2><p>Exportiere alle Bücher, Schlagworte, Bewertungen, Ausleihen und Aktivitäten in einer JSON-Datei.</p><button id="exportJson" class="btn btn-primary">JSON-Backup erstellen</button></div>
           <div class="panel settings-panel"><span class="settings-icon">↥</span><h2>Backup wiederherstellen</h2><p>Importiere eine zuvor exportierte JSON-Datei. Die aktuelle Sammlung wird dabei ersetzt.</p><label class="btn btn-light file-btn">JSON-Backup importieren <input id="importJson" type="file" accept=".json,application/json" hidden /></label></div>
+          <div class="panel settings-panel"><span class="settings-icon">▣</span><h2>Fehlende Cover finden</h2><p>Suche bei Open Library und Google Books nach Covern für bis zu 15 Bücher ohne Cover pro Durchlauf.</p><button id="fillCovers" class="btn btn-light">Fehlende Cover suchen</button><p id="fillCoversInfo" class="field-hint" role="status"></p></div>
           <div class="panel settings-panel"><span class="settings-icon">▤</span><h2>CSV-Export</h2><p>Exportiere deine Bücher als Tabelle für Excel und andere Bibliotheksprogramme.</p><button id="exportCsv" class="btn btn-light">Bücher als CSV speichern</button></div>
           <div class="panel settings-panel"><span class="settings-icon">✦</span><h2>Mit ChatGPT nutzen</h2><p>Erstelle einen Text mit deinem App-Link, damit ChatGPT Empfehlungen als Übernahmelinks ausgeben kann.</p><button id="copyChatSetup" class="btn btn-light">Chat-Vorlage kopieren</button><button id="copyLibraryList" class="text-button left-link">Bibliotheksliste für Chat kopieren</button></div>
           <div class="panel settings-panel full-width notice-panel"><h2>Datenspeicherung in Version 1</h2><p>Deine Bücher und Aktivitäten werden <strong>lokal auf diesem Gerät im Browser</strong> gespeichert. Es gibt noch keine Cloud-Synchronisierung, Nutzerkonten oder direkte ChatGPT-Schreibschnittstelle. Ein gelöschter Browser-Datenspeicher kann deine Einträge entfernen – sichere deshalb regelmäßig eine JSON-Datei. ISBN-Suche und Online-Cover benötigen Internet.</p></div>
@@ -74,11 +73,11 @@
   </div>
 
   <nav class="bottom-nav" aria-label="Hauptnavigation">
-    <button data-nav="library" class="active"><span class="nav-icon">▦</span><span>Sammlung</span></button>
-    <button data-nav="want"><span class="nav-icon">♧</span><span>Merkliste</span></button>
-    <button id="mobileAdd" class="nav-add" aria-label="Buch hinzufügen"><span>＋</span></button>
-    <button data-nav="stats"><span class="nav-icon">▥</span><span>Statistik</span></button>
-    <button data-nav="more"><span class="nav-icon">⚙</span><span>Mehr</span></button>
+    <button data-nav="library" class="active"><svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 7.2c-2.6-1.8-5.5-2.2-9-1.4V20c3.6-.9 6.5-.4 9 1.2 2.5-1.6 5.4-2.1 9-1.2V5.8c-3.5-.8-6.4-.4-9 1.4Z"/><path d="M12 7.2v14"/></svg><span>Sammlung</span></button>
+    <button data-nav="want"><svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4.5A2 2 0 0 1 8 2.5h8a2 2 0 0 1 2 2V22l-6-4-6 4V4.5Z"/></svg><span>Merkliste</span></button>
+    <button id="mobileAdd" class="nav-add" type="button" aria-label="Neues Buch hinzufügen" title="Neues Buch hinzufügen"><svg class="add-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button>
+    <button data-nav="stats"><svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 21V12"/><path d="M10 21V5"/><path d="M16 21v-8"/><path d="M22 21V9"/><path d="M2 21h20"/></svg><span>Statistik</span></button>
+    <button data-nav="more"><svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="2.5"/><path d="M19.4 15a1.7 1.7 0 0 1 .3 1.8l-1 1.8a1.7 1.7 0 0 1-1.7.8l-1.7-.4a8 8 0 0 1-1.4.8L13.5 22h-3l-.4-2.2a8 8 0 0 1-1.4-.8L7 19.4a1.7 1.7 0 0 1-1.7-.8l-1-1.8a1.7 1.7 0 0 1 .3-1.8l1.3-1.2a8 8 0 0 1 0-1.6L4.6 11a1.7 1.7 0 0 1-.3-1.8l1-1.8A1.7 1.7 0 0 1 7 6.6l1.7.4a8 8 0 0 1 1.4-.8L10.5 4h3l.4 2.2a8 8 0 0 1 1.4.8l1.7-.4a1.7 1.7 0 0 1 1.7.8l1 1.8a1.7 1.7 0 0 1-.3 1.8L18.1 12a8 8 0 0 1 0 1.6L19.4 15Z"/></svg><span>Mehr</span></button>
   </nav>
 </div>
 
@@ -88,8 +87,8 @@
   <div class="sheet-body"><form id="bookForm">
     <input type="hidden" id="bookId" />
     <div class="scan-box"><label for="isbnInput">ISBN / EAN</label><div class="isbn-row"><input id="isbnInput" inputmode="numeric" autocomplete="off" placeholder="ISBN-13 oder ISBN-10" /><button type="button" id="findIsbn" class="btn btn-dark">Suchen</button><button type="button" id="scanIsbn" class="square-action" title="Barcode scannen" aria-label="Barcode scannen">▣</button></div><p class="field-hint">Buchdaten werden online aus Open Library geladen, soweit verfügbar.</p></div>
-    <div class="cover-and-fields"><div class="cover-editor"><img id="coverPreview" alt="Buchcover" class="hidden" /><span id="coverPlaceholder">Cover</span><label class="cover-upload">Bild wählen<input id="coverFile" type="file" accept="image/*" hidden /></label></div><div class="stacked-fields"><div class="field"><label for="titleInput">Buchtitel *</label><input id="titleInput" required placeholder="Titel" /></div><div class="field"><label for="firstNameInput">Autor – Vorname</label><input id="firstNameInput" placeholder="Vorname" /></div><div class="field"><label for="lastNameInput">Autor – Nachname</label><input id="lastNameInput" placeholder="Nachname" /></div></div></div>
-    <div class="two-col"><div class="field"><label for="publisherInput">Verlag</label><input id="publisherInput" placeholder="Verlag" /></div><div class="field"><label for="yearInput">Erscheinungsjahr</label><input id="yearInput" inputmode="numeric" type="number" min="0" max="2200" placeholder="Jahr" /></div></div>
+    <div class="cover-and-fields"><div class="cover-editor"><img id="coverPreview" alt="Buchcover" class="hidden" /><span id="coverPlaceholder">Cover</span><label class="cover-upload">Bild wählen<input id="coverFile" type="file" accept="image/*" hidden /></label><button type="button" id="coverSearchButton" class="cover-search-button">Cover suchen</button></div><div class="stacked-fields"><div class="field"><label for="titleInput">Buchtitel *</label><input id="titleInput" required placeholder="Titel" /></div><div class="field"><label for="firstNameInput">Autor – Vorname</label><input id="firstNameInput" placeholder="Vorname" /></div><div class="field"><label for="lastNameInput">Autor – Nachname</label><input id="lastNameInput" placeholder="Nachname" /></div></div></div>
+    <p id="coverInfo" class="field-hint cover-info" role="status" aria-live="polite"></p><div id="coverResults" class="cover-results" aria-label="Gefundene Coverbilder"></div><div class="two-col"><div class="field"><label for="publisherInput">Verlag</label><input id="publisherInput" placeholder="Verlag" /></div><div class="field"><label for="yearInput">Erscheinungsjahr</label><input id="yearInput" inputmode="numeric" type="number" min="0" max="2200" placeholder="Jahr" /></div></div>
     <div class="two-col"><div class="field"><label for="formatInput">Format</label><select id="formatInput"><option value="print">Gedrucktes Buch</option><option value="ebook">E-Book</option><option value="audio">Hörbuch</option></select></div><div class="field"><label for="readStatusInput">Lesestatus</label><select id="readStatusInput"><option value="want">Want to Read</option><option value="reading">Lese ich / Höre ich</option><option value="read">Gelesen / Gehört</option><option value="dnf">Abgebrochen</option></select></div></div>
     <div class="two-col"><div class="field"><label for="pagesInput">Gesamtseiten</label><input id="pagesInput" type="number" min="0" placeholder="z. B. 384" /></div><div class="field"><label for="audioTotalInput">Hörbuchdauer (Min.)</label><input id="audioTotalInput" type="number" min="0" placeholder="z. B. 620" /></div></div>
     <div class="two-col"><div class="field"><label for="currentPageInput">Aktuelle Seite</label><input id="currentPageInput" type="number" min="0" placeholder="0" /></div><div class="field"><label for="currentAudioInput">Hörposition (Min.)</label><input id="currentAudioInput" type="number" min="0" placeholder="0" /></div></div>
