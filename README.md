@@ -5,6 +5,7 @@ Eine lokale, private Progressive Web App für die eigene Bibliothek.
 ## Enthalten
 - Buchverwaltung mit Nachname, Vorname, Verlag, Erscheinungsjahr, Format und ISBN.
 - ISBN-Metadatensuche bei Open Library; Barcode-Kamera, sofern der Browser die native `BarcodeDetector`-API anbietet.
+- Automatische Cover-Suche bei Open Library und Google Books: ISBN oder Titel/Autor, auswählbare Vorschläge, Nachsuche für Bücher ohne Cover.
 - Buchcover via ISBN oder eigener Bilddatei (Bilddatei wird komprimiert).
 - Schlagworte, Notizen, Bewertung 1–10, Ausleihen und Rückgabetermine.
 - Lesestatus: Want to Read, Reading, Read, DNF.
