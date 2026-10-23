@@ -51,3 +51,203 @@
 .medimops-edition-text a{font-size:13px;color:var(--green);font-weight:750;text-decoration:underline;text-underline-offset:3px;}
 .medimops-fallback{padding:14px 0;}
 .medimops-fallback .btn{text-decoration:none;white-space:normal;}
+
+
+/* --------------------------------------------------------------
+   Leseatelier · Botanical Night theme
+   Inspired by the user's dark-petrol, sand, apricot and lilac
+   reference. All overrides are visual; IndexedDB remains intact.
+   -------------------------------------------------------------- */
+:root{
+  --green:#183a33;
+  --green-hover:#0f2c27;
+  --ink:#20342e;
+  --muted:#667166;
+  --bg:#102f2a;
+  --surface:#f2edcf;
+  --line:#d8ceaf;
+  --warm:#e5ddbc;
+  --terracotta:#e09d75;
+  --petrol:#102f2a;
+  --petrol-soft:#1a4038;
+  --sand:#b8ad8c;
+  --cream:#f2edcf;
+  --apricot:#e09d75;
+  --lilac:#9398e1;
+  --olive:#596c58;
+  --gold:#d7a638;
+  --shadow:0 12px 30px rgba(5,24,20,.15);
+  color:var(--cream);
+  background:var(--bg);
+}
+html{background:var(--bg);}
+body{background:var(--bg);color:var(--cream);}
+.content-shell{background:linear-gradient(165deg,#10362f 0%,#102f2a 40%,#0b2825 100%);}
+.side-nav{background:#163b34;border-color:#2a5549;}
+.brand-side,.topbar-brand{color:var(--cream);}
+.brand-symbol{color:var(--gold);}
+.side-caption{color:#c2b792;}
+.side-link{color:#e5e2cc;}
+.side-link .nav-icon{color:var(--cream);}
+.side-link.active{background:#e5dcb7;color:#163b34;}
+.side-link.active .nav-icon{color:#163b34;}
+.side-link:hover:not(.active){background:#285046;color:var(--cream);}
+.side-footer{color:#c9c4a9;}
+.topbar{background:#163b34;border-bottom-color:#35594f;}
+.topbar-context{color:#d7d1b8;}
+.round-btn{background:var(--apricot);color:var(--green);}
+.heading-row h1,h1{color:var(--cream);}
+.heading-dot{color:var(--gold);}
+.eyebrow{color:#e2b453;}
+.subhead{color:#d2d0b8;}
+.result-header h2{color:var(--cream);}
+.small-muted{color:#d2caaa;}
+.settings-panel h2,.panel h2{color:var(--green);}
+.panel-heading p{color:#676f64;}
+.btn-primary,.btn-dark{background:var(--gold);color:#183329;}
+.btn-primary:hover,.btn-dark:hover{background:#efc15b;color:#183329;}
+.btn-light{background:#e0d5aa;color:var(--green);}
+.btn-light:hover{background:#d2c38f;}
+.btn-danger{background:#f4d3bf;color:#773923;}
+.btn:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{
+  outline:3px solid var(--gold);
+  outline-offset:2px;
+}
+.overview-card,.stat-card{
+  border:1px solid rgba(0,0,0,.055);
+  box-shadow:0 10px 26px rgba(3,24,19,.16);
+  border-radius:19px;
+  background:var(--cream);
+  color:var(--ink);
+}
+.overview-card:nth-child(4n+1),.stat-card:nth-child(4n+1){background:var(--cream);}
+.overview-card:nth-child(4n+2),.stat-card:nth-child(4n+2){background:var(--apricot);}
+.overview-card:nth-child(4n+3),.stat-card:nth-child(4n+3){background:var(--lilac);}
+.overview-card:nth-child(4n+4),.stat-card:nth-child(4n+4){background:var(--olive);}
+.overview-icon,.stat-icon,.overview-val,.stat-value{color:#19352e;}
+.overview-label,.stat-label,.stat-unit{color:#455248;}
+.overview-card:nth-child(4n+4) .overview-icon,
+.overview-card:nth-child(4n+4) .overview-val,
+.overview-card:nth-child(4n+4) .overview-label,
+.stat-card:nth-child(4n+4) .stat-icon,
+.stat-card:nth-child(4n+4) .stat-value,
+.stat-card:nth-child(4n+4) .stat-label,
+.stat-card:nth-child(4n+4) .stat-unit{color:#fff5df;}
+.search-wrap,.toolbar select{
+  background:#f2edcf;
+  border:1px solid #ded3b4;
+  color:var(--ink);
+}
+.search-icon{color:#496456;}
+.search-wrap input{color:var(--ink);}
+.search-wrap input::placeholder{color:#637466;opacity:1;}
+.toolbar select{color:var(--ink);}
+.book-card,.want-books-grid .want-book{
+  background:var(--cream);
+  border:1px solid #dfd6b7;
+  color:var(--ink);
+  border-radius:18px;
+  box-shadow:0 7px 22px rgba(3,22,18,.14);
+}
+.book-card:hover{box-shadow:0 13px 34px rgba(3,22,18,.22);}
+.book-title{color:#17382f;}
+.book-author,.book-publisher{color:#56675b;}
+.book-tags .chip,.chip{background:#ddd4aa;color:#244536;}
+.book-cover{background:#dfd6b6;}
+.cover-fallback{background:linear-gradient(135deg,#19483a,#927e40);color:var(--cream);}
+.book-card:nth-child(3n) .cover-fallback{background:linear-gradient(135deg,#a86351,#e09d75);}
+.book-card:nth-child(4n) .cover-fallback{background:linear-gradient(135deg,#6364a3,#a2a4df);}
+.status-badge{background:#dce4c4;color:#2d5541;}
+.status-badge.want{background:#dcd6fa;color:#4e4175;}
+.status-badge.read{background:#d4ddbc;color:#28533b;}
+.status-badge.lent{background:#f3d4b8;color:#85462e;}
+.rating-small,.star-line{color:#a66d13;}
+.empty-state{
+  background:#1c423a;
+  border:1px dashed #6f8270;
+  color:var(--cream);
+}
+.empty-symbol{color:var(--gold);}
+.empty-state h3{color:var(--cream);}
+.empty-state p{color:#d6d3b9;}
+.info-strip{background:#e0a37b;color:#263c32;}
+.info-icon{color:#204534;}
+.inline-action{color:#143a31;}
+.period-control{background:#244b41;border:1px solid #3f6357;}
+.period-control button{color:#eee8cd;}
+.period-control button.active{background:var(--cream);color:#193d34;}
+.period-navigation #periodLabel{color:var(--cream);}
+.period-navigation .btn{background:#e5dcb7;color:#183a33;}
+.panel{background:var(--cream);border:1px solid #dbd2b2;box-shadow:var(--shadow);border-radius:19px;color:var(--ink);}
+.legend-dot.green{background:var(--gold);}
+.legend-dot.terracotta{background:var(--apricot);}
+.chart .bar-green{fill:var(--gold);}
+.chart .bar-terra{fill:#dc8760;}
+.chart line{stroke:#d8ceb0;}
+.chart text{fill:#566553;}
+.chart-empty{color:#647362;}
+.text-button{color:#205345;}
+.session-row{border-color:#d6cba9;}
+.session-circle{background:#e1d9b4;color:var(--green);}
+.session-circle.listen{background:#e8bd9d;color:#693d2d;}
+.session-desc strong{color:var(--green);}
+.sessions-empty{color:var(--muted);}
+.settings-panel p{color:#5f6c60;}
+.notice-panel{background:#e1d8ba;}
+.notice-panel p{color:#435447;}
+.sheet{background:var(--cream);color:var(--ink);box-shadow:-18px 0 40px rgba(0,0,0,.24);}
+.sheet-top{border-bottom:1px solid #d6cba9;}
+.sheet-top h2{color:#173a32;}
+.close-btn{background:#dfd5ae;color:#194036;}
+.field label,.scan-box>label{color:#38564a;}
+.field-hint{color:#687567;}
+.field input:not([type=range]),.field textarea,
+.isbn-row input,select,.field select{
+  background:#fffbee;
+  border:1px solid #cfc5a5;
+  color:#263b32;
+}
+.field input::placeholder,.field textarea::placeholder,.isbn-row input::placeholder{color:#748074;opacity:1;}
+.field input:focus,.field textarea:focus,.isbn-row input:focus,select:focus{border-color:#7b8863;}
+.scan-box{background:#e9dfbd;border-color:#d5c9a7;}
+.cover-editor{background:linear-gradient(145deg,#1a4139,#866d42);color:var(--cream);}
+.cover-upload,.cover-search-button{background:#f3ecd6;color:#1c4037;}
+.cover-choice{background:#f7f0d8;border-color:#d2c7a8;color:#435949;}
+.detail-meta h3{color:#1a4037;}
+.detail-meta p,.detail-notes{color:#5c695d;}
+.detail-progress{background:#ddd3b0;}
+.detail-progress>div{background:#d4a438;}
+.divider-line,.detail-section{border-color:#d7cbab;}
+.scanner-frame{background:#102f2a;}
+.scanner-target{border-color:var(--gold);}
+.toast{background:#153a32;color:var(--cream);}
+.toast.error{background:#9f4c3a;color:#fff7ed;}
+.bottom-nav{background:#163b34;border-top:1px solid #3b5b4f;box-shadow:0 -10px 28px rgba(5,24,20,.3);}
+.bottom-nav button{color:#dbddc9;}
+.bottom-nav button.active,.bottom-nav button.active .nav-icon{color:#e5ba54;}
+.bottom-nav .nav-add,.bottom-nav .nav-add:focus-visible{
+  background:var(--apricot);
+  color:#143b32;
+  box-shadow:0 9px 22px rgba(0,0,0,.3);
+}
+.want-books-grid .want-book{background:var(--cream);}
+.want-medimops{border-color:#d6cba9;}
+.want-medimops-caption{color:#536653;}
+.want-medimops-buttons button{background:#1c483d;color:var(--cream);}
+.want-medimops-buttons button:hover{background:#2d6050;}
+.medimops-edition{border-color:#d8ccac;}
+.medimops-edition-text a{color:#205a49;}
+.medimops-edition-text small,.medimops-note,.medimops-fallback p{color:#5c6f60;}
+.medimops-fallback .btn{color:#1d4839;}
+/* Retain the single floating add button on larger screens. */
+@media(min-width:851px){
+  .bottom-nav{background:transparent;border:0;box-shadow:none;}
+  .bottom-nav .nav-add{background:var(--apricot);color:#143b32;}
+}
+/* The original mobile stylesheet used tiny control text. On iOS,
+   16px prevents focus zoom while retaining intentional pinch zoom. */
+@media(pointer:coarse){
+  .search-wrap input,.toolbar select,
+  .field input:not([type=range]),.field textarea,
+  .isbn-row input,select{font-size:16px!important;}
+}
