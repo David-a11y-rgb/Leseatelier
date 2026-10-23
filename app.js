@@ -68,9 +68,21 @@ function fmtNum(n){return new Intl.NumberFormat('de-DE',{maximumFractionDigits:1
 function fmtDay(iso){if(!iso)return '';try{return new Intl.DateTimeFormat('de-DE',{day:'2-digit',month:'short',year:'numeric'}).format(parseDay(iso));}catch(_){return iso;}}
 function toast(message,error=false){const el=$('toast');el.textContent=message;el.classList.remove('hidden');el.classList.toggle('error',error);clearTimeout(toast.timer);toast.timer=setTimeout(()=>el.classList.add('hidden'),4200);}
 function openSheet(sheet){$('overlay').classList.remove('hidden');$(sheet).classList.remove('hidden');document.body.style.overflow='hidden';}
+function stopLiveVideo(){
+  const stream=liveScanStream;liveScanStream=null;
+  if(stream)for(const track of stream.getTracks())track.stop();
+  if(activeLiveVideo){
+    activeLiveVideo.pause();
+    activeLiveVideo.srcObject=null;
+    activeLiveVideo.remove();
+    activeLiveVideo=null;
+  }
+}
 async function stopScan(){
   scanSession++;
+  liveScanCompleted=false;
   if(enhancedScanTimer!==null){clearInterval(enhancedScanTimer);enhancedScanTimer=null;}
+  stopLiveVideo();
   const scanner=html5Scanner;html5Scanner=null;
   if(scanner){try{await scanner.stop();}catch(_){}try{scanner.clear();}catch(_){}}
 }
@@ -577,107 +589,126 @@ function loadEnhancedDecoder(){
       const script=document.createElement('script');
       script.src='https://cdn.jsdelivr.net/npm/zxing-wasm@2.2.2/dist/iife/reader/index.js';
       script.async=true;
-      script.onload=()=>window.ZXingWASM?.readBarcodes?resolve(window.ZXingWASM):reject(new Error('Zweite Barcode-Erkennung fehlt'));
-      script.onerror=()=>reject(new Error('Zweite Barcode-Erkennung nicht verfügbar'));
+      script.onload=()=>window.ZXingWASM?.readBarcodes?resolve(window.ZXingWASM):reject(new Error('ZXing nicht verfügbar'));
+      script.onerror=()=>reject(new Error('ZXing konnte nicht geladen werden'));
       document.head.append(script);
     }).catch(e=>{enhancedDecoderPromise=null;throw e;});
   }
   return enhancedDecoderPromise;
 }
 function readIsbnBarcode(raw){
-  const digits=String(raw||'').replace(/\D/g,'');
-  return /^(978|979)\d{10}$/.test(digits)?digits:null;
+  const value=String(raw||'');
+  const match=value.replace(/[^0-9]/g,'').match(/(?:978|979)\d{10}/);
+  if(!match)return null;
+  const isbn=match[0];
+  const sum=[...isbn.slice(0,12)].reduce((total,d,i)=>total+Number(d)*(i%2?3:1),0);
+  const check=(10-(sum%10))%10;
+  return check===Number(isbn[12])?isbn:null;
 }
 function applyScannedIsbn(raw){
   const isbn=readIsbnBarcode(raw);
-  if(!isbn||$('scannerSheet').classList.contains('hidden'))return false;
+  if(!isbn||$('scannerSheet').classList.contains('hidden')||liveScanCompleted)return false;
+  liveScanCompleted=true;
+  // A live match immediately closes the camera and fills ISBN metadata,
+  // without any photo shutter or user confirmation.
   closeSheets();
   $('isbnInput').value=isbn;
   openSheet('bookSheet');
-  toast('ISBN erkannt: '+isbn);
-  lookupISBN();
+  toast('ISBN automatisch erkannt: '+isbn);
+  void lookupISBN();
   return true;
 }
-function adjustScannerCamera(scanner){
-  // iOS sometimes returns a low-resolution or unfocused live camera stream.
-  // Applying video constraints after start() helps it renegotiate the track.
-  try{
-    const capabilities=scanner.getRunningTrackCapabilities?.()||{};
-    const settings=scanner.getRunningTrackSettings?.()||{};
-    const advanced=[];
-    const zoomInfo=capabilities.zoom;
-    if(zoomInfo && typeof zoomInfo==='object' && Number.isFinite(zoomInfo.max)){
-      const zoom=Math.min(1.6,zoomInfo.max);
-      if(zoom>=(zoomInfo.min||1))advanced.push({zoom});
-    }
-    const constraints={width:{ideal:1280},height:{ideal:720},frameRate:{ideal:24}};
-    if(advanced.length)constraints.advanced=advanced;
-    return scanner.applyVideoConstraints(constraints).catch(err=>console.info('Kameravorgaben nicht anwendbar:',err));
-  }catch(err){console.info('Kamera-Anpassung nicht möglich:',err);return Promise.resolve();}
-}
-async function startEnhancedScan(token){
-  try{
-    const decoder=await loadEnhancedDecoder();
-    if(token!==scanSession || $('scannerSheet').classList.contains('hidden'))return;
-    const canvas=document.createElement('canvas');
-    const ctx=canvas.getContext('2d',{willReadFrequently:true});
-    if(!ctx)return;
-    enhancedScanTimer=setInterval(async()=>{
-      if(enhancedScanBusy||token!==scanSession||document.hidden)return;
-      const video=$('scannerReader').querySelector('video');
-      if(!video||video.readyState<2||!video.videoWidth||!video.videoHeight)return;
-      enhancedScanBusy=true;
-      try{
-        const scale=Math.min(1,1280/video.videoWidth);
-        canvas.width=Math.round(video.videoWidth*scale);
-        canvas.height=Math.round(video.videoHeight*scale);
-        ctx.drawImage(video,0,0,canvas.width,canvas.height);
-        const frame=ctx.getImageData(0,0,canvas.width,canvas.height);
-        const matches=await decoder.readBarcodes(frame,{
-          formats:['EAN13','EAN8','Code128'],tryHarder:true,maxNumberOfSymbols:2
-        });
-        if(token===scanSession){
-          for(const match of matches){
-            if(applyScannedIsbn(match.text))break;
-          }
-        }
-      }catch(err){console.debug('Erweiterter Scan:',err);}
-      finally{enhancedScanBusy=false;}
-    },1100);
-  }catch(e){console.warn('Erweiterte Barcode-Erkennung konnte nicht geladen werden:',e);}
+async function fallbackBarcodeScanner(token){
+  if(token!==scanSession||$('scannerSheet').classList.contains('hidden'))return;
+  stopLiveVideo();
+  $('scannerMessage').textContent='Automatischer Kamera-Scan läuft (alternativer Decoder). Barcode ruhig und gerade ins Bild halten.';
+  await loadScannerLibrary();
+  if(token!==scanSession||$('scannerSheet').classList.contains('hidden'))return;
+  const scanner=new Html5Qrcode('scannerReader',{
+    formatsToSupport:[Html5QrcodeSupportedFormats.EAN_13,Html5QrcodeSupportedFormats.CODE_128],
+    experimentalFeatures:{useBarCodeDetectorIfSupported:false},
+    verbose:false
+  });
+  html5Scanner=scanner;
+  await scanner.start({facingMode:'environment'},
+    {fps:9,qrbox:(w,h)=>({width:Math.max(180,Math.floor(w*.9)),height:Math.max(90,Math.floor(h*.5))})},
+    result=>{if(token===scanSession)applyScannedIsbn(result);},()=>{});
+  if(token!==scanSession||$('scannerSheet').classList.contains('hidden')){
+    try{await scanner.stop();}catch(_){}try{scanner.clear();}catch(_){}
+  }
 }
 async function openScanner(){
   openSheet('scannerSheet');
-  $('scannerMessage').textContent='Kamera wird vorbereitet. Halte die Buchrückseite ruhig und gut beleuchtet.';
+  $('scannerMessage').textContent='Kamera startet. Die ISBN wird fortlaufend im Livebild erkannt – kein Foto nötig.';
   const token=++scanSession;
+  liveScanCompleted=false;
+  const frameContainer=$('scannerReader');
   try{
-    if(!navigator.mediaDevices?.getUserMedia)throw new Error('Kamera nicht verfügbar');
-    await loadScannerLibrary();
-    if(token!==scanSession||$('scannerSheet').classList.contains('hidden'))return;
-    const scanner=new Html5Qrcode('scannerReader',{
-      formatsToSupport:[Html5QrcodeSupportedFormats.EAN_13,Html5QrcodeSupportedFormats.EAN_8,Html5QrcodeSupportedFormats.CODE_128],
-      experimentalFeatures:{useBarCodeDetectorIfSupported:false},verbose:false
+    if(!navigator.mediaDevices?.getUserMedia)throw Error('Kamerazugriff nicht unterstützt');
+    // Start camera immediately. An independent WASM barcode engine reads
+    // frames directly from the ongoing feed, not still photographs.
+    const video=document.createElement('video');
+    video.autoplay=true;video.muted=true;video.playsInline=true;
+    video.setAttribute('playsinline','');
+    video.setAttribute('aria-label','Live-Kamerabild zur ISBN-Erkennung');
+    video.style.cssText='width:100%;height:100%;object-fit:cover;';
+    frameContainer.replaceChildren(video);
+    activeLiveVideo=video;
+    const stream=await navigator.mediaDevices.getUserMedia({
+      audio:false,video:{facingMode:{ideal:'environment'},
+        width:{ideal:1920},height:{ideal:1080},frameRate:{ideal:24}}
     });
-    html5Scanner=scanner;
-    await scanner.start({facingMode:'environment'},
-      {fps:12,disableFlip:true,aspectRatio:1.777778},
-      result=>{if(token===scanSession)applyScannedIsbn(result);},()=>{});
     if(token!==scanSession||$('scannerSheet').classList.contains('hidden')){
-      try{await scanner.stop();}catch(_){}
-      try{scanner.clear();}catch(_){}
-      return;
+      stream.getTracks().forEach(track=>track.stop());return;
     }
-    $('scannerMessage').textContent='Scanner aktiv. Barcode waagerecht, aus ca. 15–25 cm Abstand und bei gutem Licht zeigen. Falls nichts erkannt wird: „Barcode-Foto auswählen“.';
-    // Use a second, independent ZXing-C++ decoder in parallel where available.
-    startEnhancedScan(token);
-    adjustScannerCamera(scanner);
-  }catch(e){
+    liveScanStream=stream;video.srcObject=stream;await video.play();
+    $('scannerMessage').textContent='ISBN-Erkennung aktiv. Barcode waagerecht in die Bildmitte halten. Automatische Übernahme bei Erkennung.';
+    let decoder;
+    try{decoder=await loadEnhancedDecoder();}
+    catch(e){console.warn('ZXing konnte nicht geladen werden:',e);
+      await fallbackBarcodeScanner(token);return;}
+    if(token!==scanSession||$('scannerSheet').classList.contains('hidden'))return;
+    const canvas=document.createElement('canvas');
+    const ctx=canvas.getContext('2d',{willReadFrequently:true});
+    if(!ctx)throw Error('Canvas nicht verfügbar');
+    let errors=0,cycles=0;
+    enhancedScanTimer=setInterval(async()=>{
+      if(enhancedScanBusy||liveScanCompleted||token!==scanSession||document.hidden||video.readyState<2)return;
+      enhancedScanBusy=true;
+      try{
+        const scale=Math.min(1,1600/video.videoWidth);
+        canvas.width=Math.max(1,Math.round(video.videoWidth*scale));
+        canvas.height=Math.max(1,Math.round(video.videoHeight*scale));
+        ctx.drawImage(video,0,0,canvas.width,canvas.height);
+        const image=ctx.getImageData(0,0,canvas.width,canvas.height);
+        const matches=await decoder.readBarcodes(image,{
+          formats:['EAN13','Code128','UPCA'],tryHarder:true,maxNumberOfSymbols:4
+        });
+        errors=0;cycles++;
+        if(token===scanSession){
+          for(const match of matches||[]){if(applyScannedIsbn(match.text))break;}
+          if(cycles===14&&!liveScanCompleted)
+            $('scannerMessage').textContent='Scanner sucht weiter: Barcode gut beleuchten, Bild scharf halten und Abstand leicht verändern. Kein Foto nötig.';
+        }
+      }catch(e){
+        errors++;
+        console.debug('Live-Barcode-Decoder:',e);
+        if(errors>=3 && token===scanSession){
+          clearInterval(enhancedScanTimer);enhancedScanTimer=null;
+          try{await fallbackBarcodeScanner(token);}
+          catch(err){console.warn('Alternativer Scanner:',err);
+            $('scannerMessage').textContent='Die Live-Erkennung ist momentan nicht verfügbar. ISBN kann weiterhin manuell eingegeben werden.';}
+        }
+      }finally{enhancedScanBusy=false;}
+    },620);
+  }catch(err){
+    console.warn('Kamera-Scan konnte nicht gestartet werden:',err);
     if(token!==scanSession)return;
-    await stopScan();
-    console.warn('Scanner:',e);
-    $('scannerMessage').textContent='Kamera konnte nicht gestartet werden. Prüfe die Kamerafreigabe. Alternativ kannst du ein Barcode-Foto aufnehmen oder die ISBN eingeben.';
+    stopLiveVideo();
+    $('scannerMessage').textContent='Kamera konnte nicht gestartet werden. Bitte die Kamerafreigabe in Safari prüfen.';
   }
 }
+
 async function barcodeFromPhoto(file){
   if(!file)return;
   const el=$('scannerMessage');
